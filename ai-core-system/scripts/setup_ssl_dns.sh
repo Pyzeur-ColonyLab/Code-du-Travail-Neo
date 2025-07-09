@@ -37,9 +37,8 @@ copy_certificates() {
     # Backup current docker-compose
     cp docker-compose.yml docker-compose.yml.backup
     
-    # Update docker-compose to include SSL volumes and ports
-    sed -i 's/- "80:80"/- "80:80"\n      - "443:443"/' docker-compose.yml
-    sed -i '/volumes:/a\      - ./ssl:/etc/nginx/ssl:ro' docker-compose.yml
+    # Switch to SSL docker-compose configuration
+    cp docker-compose-ssl.yml docker-compose.yml
 
     # Switch to SSL nginx configuration
     echo "Switching to SSL nginx configuration..."
