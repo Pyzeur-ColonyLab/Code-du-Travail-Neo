@@ -28,8 +28,8 @@ sudo docker compose stop nginx
 echo "Requesting SSL certificate from Let's Encrypt..."
 sudo certbot certonly --standalone \
     --email $EMAIL \
-    --agree-tos \
-    --no-eff-email \
+        --agree-tos \
+        --no-eff-email \
     -d $DOMAIN \
     -d www.$DOMAIN \
     -d ai.$DOMAIN
