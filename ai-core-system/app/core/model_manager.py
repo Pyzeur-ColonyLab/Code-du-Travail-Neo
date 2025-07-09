@@ -80,15 +80,19 @@ class ModelManager:
             config = self.model_configs[model_name]
             logger.info(f"Loading model '{model_name}' with config: {config}")
             
-            # Set up quantization if specified
+            # Set up quantization if specified and GPU is available
             quantization_config = None
-            if config.get("quantization") == "4bit":
+            if config.get("quantization") == "4bit" and self.device == "cuda":
                 quantization_config = BitsAndBytesConfig(
                     load_in_4bit=True,
                     bnb_4bit_compute_dtype=torch.float16,
                     bnb_4bit_use_double_quant=True,
                     bnb_4bit_quant_type="nf4"
                 )
+            elif config.get("quantization") == "4bit" and self.device == "cpu":
+                logger.warning("4-bit quantization requires GPU. Falling back to CPU without quantization.")
+                # Remove quantization for CPU
+                config["quantization"] = "none"
             
             # Load tokenizer
             tokenizer = AutoTokenizer.from_pretrained(
@@ -101,24 +105,45 @@ class ModelManager:
             if tokenizer.pad_token is None:
                 tokenizer.pad_token = tokenizer.eos_token
             
-            # Load model
-            model = AutoModelForCausalLM.from_pretrained(
-                config["path"],
-                quantization_config=quantization_config,
-                cache_dir=self.cache_dir,
-                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-                device_map="auto" if self.device == "cuda" else None,
-                trust_remote_code=True
-            )
+            # Load model with CPU optimizations
+            if self.device == "cpu":
+                # For CPU, use float32 and load to CPU directly
+                model = AutoModelForCausalLM.from_pretrained(
+                    config["path"],
+                    cache_dir=self.cache_dir,
+                    torch_dtype=torch.float32,
+                    device_map=None,
+                    trust_remote_code=True,
+                    low_cpu_mem_usage=True
+                ).to("cpu")
+            else:
+                # For GPU, use the original approach
+                model = AutoModelForCausalLM.from_pretrained(
+                    config["path"],
+                    quantization_config=quantization_config,
+                    cache_dir=self.cache_dir,
+                    torch_dtype=torch.float16,
+                    device_map="auto",
+                    trust_remote_code=True
+                )
             
-            # Create pipeline
-            pipe = pipeline(
-                "text-generation",
-                model=model,
-                tokenizer=tokenizer,
-                device=self.device,
-                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32
-            )
+            # Create pipeline with CPU optimizations
+            if self.device == "cpu":
+                pipe = pipeline(
+                    "text-generation",
+                    model=model,
+                    tokenizer=tokenizer,
+                    device="cpu",
+                    torch_dtype=torch.float32
+                )
+            else:
+                pipe = pipeline(
+                    "text-generation",
+                    model=model,
+                    tokenizer=tokenizer,
+                    device=self.device,
+                    torch_dtype=torch.float16
+                )
             
             # Store loaded model
             self.loaded_models[model_name] = {

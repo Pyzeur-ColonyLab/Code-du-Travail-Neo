@@ -1,13 +1,13 @@
 {
   "models": {
-    "mistral-7b-instruct": {
+    "tiny-llama": {
       "type": "transformers",
-      "path": "mistralai/Mistral-7B-Instruct-v0.2",
+      "path": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
       "format": "safetensor",
-      "device": "auto",
-      "quantization": "4bit",
-      "max_memory": "8GB",
-      "context_length": 4096,
+      "device": "cpu",
+      "quantization": "none",
+      "max_memory": "2GB",
+      "context_length": 2048,
       "temperature": 0.7,
       "top_p": 0.9,
       "max_tokens": 512
@@ -16,28 +16,28 @@
       "type": "transformers",
       "path": "microsoft/phi-2",
       "format": "safetensor",
-      "device": "auto",
-      "quantization": "4bit",
+      "device": "cpu",
+      "quantization": "none",
       "max_memory": "4GB",
       "context_length": 2048,
       "temperature": 0.7,
       "top_p": 0.9,
       "max_tokens": 512
     },
-    "tiny-llama": {
+    "mistral-7b-instruct": {
       "type": "transformers",
-      "path": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+      "path": "mistralai/Mistral-7B-Instruct-v0.2",
       "format": "safetensor",
-      "device": "auto",
-      "quantization": "4bit",
-      "max_memory": "2GB",
-      "context_length": 2048,
+      "device": "cpu",
+      "quantization": "none",
+      "max_memory": "8GB",
+      "context_length": 4096,
       "temperature": 0.7,
       "top_p": 0.9,
       "max_tokens": 512
     }
   },
-  "default_model": "phi-2",
+  "default_model": "tiny-llama",
   "model_cache_dir": "/app/cache",
   "model_load_timeout": 300,
   "model_unload_timeout": 60

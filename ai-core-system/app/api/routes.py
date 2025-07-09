@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/v1", tags=["AI Core System"])
 # Request/Response Models
 class ChatRequest(BaseModel):
     message: str
-    model: str = "phi-2"
+    model: str = "tiny-llama"
     temperature: Optional[float] = 0.7
     max_tokens: Optional[int] = 512
     top_p: Optional[float] = 0.9
