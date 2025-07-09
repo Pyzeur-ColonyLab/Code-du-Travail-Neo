@@ -1,0 +1,304 @@
+# MAIN SYSTEM - AI CORE SYSTEM SPECIFICATION
+# ===========================================
+
+## PROJECT OVERVIEW
+Create a modular AI core system that serves as the central API for running various AI models (GGUF, SafeTensor, etc.) and can be easily integrated with different services (Telegram, Email, Web Interface).
+
+## SYSTEM ARCHITECTURE
+
+### Core Components
+1. **Model Manager**: Handles loading, switching, and managing different AI models
+2. **API Server**: FastAPI-based REST API for model inference
+3. **Model Registry**: Configuration system for different model types
+4. **Caching Layer**: Redis-based caching for responses and model weights
+5. **Health Monitoring**: System health checks and metrics
+6. **Authentication**: API key management and rate limiting
+
+### Supported Model Formats
+- GGUF (llama.cpp compatible)
+- SafeTensor (HuggingFace Transformers)
+- ONNX (optimized inference)
+- LoRA adapters (for fine-tuned models)
+
+## TECHNICAL REQUIREMENTS
+
+### Server Specifications (Infomaniak)
+- **Instance Type**: VPS Pro 4 or VPS Pro 8
+- **CPU**: 4-8 vCPUs (AMD EPYC or Intel Xeon)
+- **RAM**: 16-32 GB RAM
+- **Storage**: 100-200 GB SSD
+- **OS**: Ubuntu 22.04 LTS or Debian 12
+- **Network**: 1 Gbps bandwidth
+
+### Software Stack
+- **Python**: 3.10+
+- **FastAPI**: Web framework
+- **Uvicorn**: ASGI server
+- **Redis**: Caching and session management
+- **Docker**: Containerization
+- **Nginx**: Reverse proxy and SSL termination
+
+### AI/ML Dependencies
+- **PyTorch**: 2.0+ (with CUDA support if GPU available)
+- **Transformers**: 4.35+
+- **llama-cpp-python**: For GGUF models
+- **ctransformers**: Alternative GGUF backend
+- **accelerate**: Model optimization
+- **bitsandbytes**: Quantization support
+
+## API DESIGN
+
+### Endpoints Structure
+```
+POST /api/v1/generate
+POST /api/v1/chat
+GET  /api/v1/models
+POST /api/v1/models/load
+POST /api/v1/models/unload
+GET  /api/v1/health
+GET  /api/v1/metrics
+```
+
+### Request/Response Format
+```json
+{
+  "model": "mistral-7b-instruct",
+  "prompt": "Your question here",
+  "max_tokens": 512,
+  "temperature": 0.7,
+  "top_p": 0.9,
+  "stream": false
+}
+```
+
+### Response Format
+```json
+{
+  "response": "AI generated response",
+  "model": "mistral-7b-instruct",
+  "tokens_used": 150,
+  "processing_time": 2.5,
+  "timestamp": "2024-01-01T12:00:00Z"
+}
+```
+
+## MODEL MANAGEMENT
+
+### Model Configuration File (models.json)
+```json
+{
+  "models": {
+    "mistral-7b-instruct": {
+      "type": "transformers",
+      "path": "mistralai/Mistral-7B-Instruct-v0.3",
+      "format": "safetensor",
+      "device": "auto",
+      "quantization": "4bit",
+      "max_memory": "8GB"
+    },
+    "llama-2-7b-chat": {
+      "type": "gguf",
+      "path": "/models/llama-2-7b-chat.gguf",
+      "context_length": 4096,
+      "threads": 8
+    }
+  }
+}
+```
+
+### Model Loading Strategy
+1. **Lazy Loading**: Load models on first request
+2. **Memory Management**: Unload unused models
+3. **Model Switching**: Hot-swap between models
+4. **Quantization**: Automatic quantization for memory efficiency
+
+## SECURITY FEATURES
+
+### Authentication
+- API key authentication
+- Rate limiting per API key
+- IP whitelisting support
+- Request logging and monitoring
+
+### Input Validation
+- Prompt length limits
+- Content filtering
+- SQL injection prevention
+- XSS protection
+
+## MONITORING AND LOGGING
+
+### Metrics
+- Request/response times
+- Token usage per model
+- Memory usage
+- Error rates
+- API key usage statistics
+
+### Logging
+- Structured JSON logging
+- Request/response logging
+- Error tracking
+- Performance metrics
+
+## DEPLOYMENT
+
+### Docker Configuration
+```yaml
+version: '3.8'
+services:
+  ai-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - MODEL_CONFIG_PATH=/app/models.json
+    volumes:
+      - ./models:/app/models
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - ai-api
+    restart: unless-stopped
+```
+
+### Environment Variables
+```bash
+# API Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
+API_WORKERS=4
+DEBUG=false
+
+# Redis Configuration
+REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=
+
+# Model Configuration
+MODEL_CONFIG_PATH=/app/models.json
+MODEL_CACHE_DIR=/app/cache
+DEFAULT_MODEL=mistral-7b-instruct
+
+# Security
+API_KEY_HEADER=X-API-Key
+RATE_LIMIT_PER_MINUTE=60
+MAX_PROMPT_LENGTH=4096
+
+# Logging
+LOG_LEVEL=INFO
+LOG_FORMAT=json
+```
+
+## INTEGRATION POINTS
+
+### For Telegram Service
+- Webhook endpoint: `POST /api/v1/webhooks/telegram`
+- Chat endpoint: `POST /api/v1/chat`
+- Model selection via API key or request parameter
+
+### For Email Service
+- Generate endpoint: `POST /api/v1/generate`
+- Batch processing support
+- Email-specific response formatting
+
+### For Web Interface
+- CORS enabled endpoints
+- WebSocket support for streaming
+- Session management
+
+## PERFORMANCE OPTIMIZATION
+
+### Caching Strategy
+- Response caching based on prompt hash
+- Model weight caching
+- Session caching for chat conversations
+
+### Load Balancing
+- Multiple API workers
+- Redis-based session sharing
+- Health check endpoints for load balancer
+
+### Memory Management
+- Model quantization
+- Dynamic model loading/unloading
+- Memory monitoring and alerts
+
+## TESTING REQUIREMENTS
+
+### Unit Tests
+- Model loading/unloading
+- API endpoint functionality
+- Authentication and authorization
+- Error handling
+
+### Integration Tests
+- End-to-end API testing
+- Model switching scenarios
+- Performance benchmarks
+- Load testing
+
+### Security Tests
+- API key validation
+- Rate limiting
+- Input sanitization
+- SQL injection prevention
+
+## DOCUMENTATION
+
+### API Documentation
+- OpenAPI/Swagger specification
+- Code examples for all endpoints
+- Authentication guide
+- Rate limiting documentation
+
+### Deployment Guide
+- Step-by-step deployment instructions
+- Environment configuration
+- SSL certificate setup
+- Monitoring setup
+
+### Integration Guide
+- Service integration examples
+- Webhook configuration
+- Error handling best practices
+
+## MIGRATION FROM CURRENT SYSTEM
+
+### Data Migration
+- Export current model configurations
+- Migrate API keys and user data
+- Preserve chat history and logs
+
+### Service Updates
+- Update Telegram bot to use new API
+- Update Email bot to use new API
+- Maintain backward compatibility during transition
+
+## SUCCESS CRITERIA
+
+1. **Performance**: API response time < 2 seconds for standard requests
+2. **Reliability**: 99.9% uptime with proper monitoring
+3. **Scalability**: Support for 100+ concurrent requests
+4. **Flexibility**: Easy addition of new model types
+5. **Security**: No security vulnerabilities in production
+6. **Monitoring**: Complete observability of system health 

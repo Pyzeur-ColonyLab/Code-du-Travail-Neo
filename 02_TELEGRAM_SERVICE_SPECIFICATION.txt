@@ -1,0 +1,393 @@
+# TELEGRAM SERVICE SPECIFICATION
+# ===============================
+
+## PROJECT OVERVIEW
+Create a Telegram bot service that connects to the main AI core system via API to provide AI-powered chat functionality. The service should be lightweight, scalable, and handle multiple users simultaneously.
+
+## SYSTEM ARCHITECTURE
+
+### Core Components
+1. **Telegram Bot Handler**: Manages Telegram API interactions
+2. **API Client**: Communicates with the main AI core system
+3. **Session Manager**: Handles user conversations and context
+4. **Message Queue**: Handles high-volume message processing
+5. **Rate Limiter**: Prevents abuse and manages API quotas
+6. **Webhook Handler**: Receives updates from Telegram
+
+### Integration Points
+- **Main AI System**: REST API calls for model inference
+- **Telegram API**: Webhook or polling for message updates
+- **Redis**: Session storage and caching
+- **Database**: User management and conversation history
+
+## TECHNICAL REQUIREMENTS
+
+### Server Specifications (Infomaniak)
+- **Instance Type**: VPS Pro 2 or VPS Pro 4
+- **CPU**: 2-4 vCPUs (AMD EPYC or Intel Xeon)
+- **RAM**: 4-8 GB RAM
+- **Storage**: 50-100 GB SSD
+- **OS**: Ubuntu 22.04 LTS or Debian 12
+- **Network**: 1 Gbps bandwidth
+
+### Software Stack
+- **Python**: 3.10+
+- **FastAPI**: Web framework for webhook handling
+- **python-telegram-bot**: Telegram Bot API wrapper
+- **Redis**: Session and cache management
+- **PostgreSQL**: User data and conversation history
+- **Docker**: Containerization
+- **Nginx**: Reverse proxy
+
+### Dependencies
+- **python-telegram-bot**: 20.0+
+- **aiohttp**: Async HTTP client
+- **redis**: Redis client
+- **sqlalchemy**: Database ORM
+- **pydantic**: Data validation
+- **python-dotenv**: Environment management
+
+## BOT FUNCTIONALITY
+
+### Core Features
+1. **Chat Interface**: Natural conversation with AI
+2. **Command System**: /start, /help, /status, /reset
+3. **Model Selection**: Allow users to choose different AI models
+4. **Conversation History**: Maintain context across messages
+5. **Rate Limiting**: Prevent abuse and manage costs
+6. **Error Handling**: Graceful handling of API failures
+
+### User Experience
+- **Welcome Message**: Clear instructions on usage
+- **Typing Indicators**: Show when AI is processing
+- **Message Formatting**: Support for markdown and HTML
+- **File Support**: Handle images, documents, voice messages
+- **Inline Keyboard**: Quick actions and model selection
+
+### Commands
+```
+/start - Initialize bot and show welcome message
+/help - Display help information and available commands
+/status - Show current system status and model info
+/reset - Clear conversation history and start fresh
+/models - List available AI models
+/switch <model> - Switch to different AI model
+/settings - Configure user preferences
+```
+
+## API INTEGRATION
+
+### Main AI System Communication
+```python
+# Example API client structure
+class AIClient:
+    def __init__(self, api_url: str, api_key: str):
+        self.api_url = api_url
+        self.api_key = api_key
+        self.session = aiohttp.ClientSession()
+    
+    async def generate_response(self, prompt: str, model: str = None) -> dict:
+        # Make API call to main AI system
+        pass
+    
+    async def chat_response(self, message: str, context: list, model: str = None) -> dict:
+        # Make chat API call with context
+        pass
+```
+
+### Request Format
+```json
+{
+  "model": "mistral-7b-instruct",
+  "prompt": "User message here",
+  "max_tokens": 512,
+  "temperature": 0.7,
+  "stream": false,
+  "context": [
+    {"role": "user", "content": "Previous message"},
+    {"role": "assistant", "content": "Previous response"}
+  ]
+}
+```
+
+### Response Handling
+```json
+{
+  "response": "AI generated response",
+  "model": "mistral-7b-instruct",
+  "tokens_used": 150,
+  "processing_time": 2.5
+}
+```
+
+## SESSION MANAGEMENT
+
+### User Session Structure
+```python
+class UserSession:
+    user_id: int
+    chat_id: int
+    current_model: str
+    conversation_history: List[dict]
+    settings: dict
+    last_activity: datetime
+    rate_limit_count: int
+```
+
+### Conversation Context
+- **Message History**: Last N messages for context
+- **Model Preferences**: User's preferred AI model
+- **Settings**: User-specific configurations
+- **Rate Limiting**: Track usage per user
+
+### Redis Storage
+```redis
+# User session
+user:{user_id}:session -> JSON string
+user:{user_id}:history -> List of messages
+user:{user_id}:settings -> User preferences
+user:{user_id}:rate_limit -> Rate limiting data
+
+# Global counters
+bot:total_users -> Total registered users
+bot:active_users -> Currently active users
+bot:total_messages -> Total messages processed
+```
+
+## MESSAGE PROCESSING
+
+### Message Flow
+1. **Receive Update**: Telegram webhook or polling
+2. **Validate User**: Check if user is authorized
+3. **Process Command**: Handle bot commands
+4. **Rate Limit Check**: Verify user hasn't exceeded limits
+5. **Send to AI**: Forward message to main AI system
+6. **Format Response**: Format AI response for Telegram
+7. **Send Response**: Send formatted response to user
+8. **Update Session**: Store conversation history
+
+### Error Handling
+- **API Timeout**: Retry with exponential backoff
+- **Rate Limit Exceeded**: Inform user and suggest waiting
+- **Model Unavailable**: Fallback to default model
+- **Network Issues**: Queue message for retry
+- **Invalid Input**: Provide helpful error message
+
+## SECURITY FEATURES
+
+### Authentication
+- **Bot Token**: Secure Telegram bot token management
+- **API Key**: Secure API key for main AI system
+- **User Validation**: Validate incoming user requests
+- **Input Sanitization**: Clean user inputs
+
+### Rate Limiting
+- **Per User**: Limit messages per user per minute
+- **Global**: Limit total API calls per minute
+- **Burst Protection**: Handle sudden traffic spikes
+- **Graceful Degradation**: Reduce quality under load
+
+### Privacy
+- **Data Encryption**: Encrypt sensitive user data
+- **Data Retention**: Configurable data retention policies
+- **GDPR Compliance**: User data deletion capabilities
+- **Log Anonymization**: Remove PII from logs
+
+## MONITORING AND LOGGING
+
+### Metrics
+- **Active Users**: Number of active users per day
+- **Message Volume**: Messages processed per hour
+- **Response Times**: Average response time from AI
+- **Error Rates**: API errors and bot errors
+- **Model Usage**: Which models are most popular
+
+### Logging
+- **User Actions**: Track user interactions
+- **API Calls**: Log all AI system API calls
+- **Errors**: Detailed error logging with context
+- **Performance**: Response time and resource usage
+
+### Health Checks
+- **Bot Status**: Telegram bot connectivity
+- **API Status**: Main AI system connectivity
+- **Database Status**: Database connectivity
+- **Redis Status**: Redis connectivity
+
+## DEPLOYMENT
+
+### Docker Configuration
+```yaml
+version: '3.8'
+services:
+  telegram-bot:
+    build: .
+    container_name: telegram-bot-service
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - AI_API_URL=${AI_API_URL}
+      - AI_API_KEY=${AI_API_KEY}
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL}
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - bot-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: telegram-bot-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - bot-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: telegram-bot-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=telegram_bot
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - bot-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: telegram-bot-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - telegram-bot
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+  postgres_data:
+```
+
+### Environment Variables
+```bash
+# Telegram Configuration
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+WEBHOOK_URL=https://your-domain.com/webhook
+WEBHOOK_SECRET=your_webhook_secret
+
+# AI System Configuration
+AI_API_URL=https://ai-api.cryptomaltese.com
+AI_API_KEY=your_api_key_here
+DEFAULT_MODEL=mistral-7b-instruct
+
+# Database Configuration
+DATABASE_URL=postgresql://user:password@postgres:5432/telegram_bot
+DB_USER=telegram_bot
+DB_PASSWORD=secure_password
+
+# Redis Configuration
+REDIS_URL=redis://redis:6379
+REDIS_PASSWORD=
+
+# Application Configuration
+DEBUG=false
+LOG_LEVEL=INFO
+MAX_MESSAGES_PER_MINUTE=30
+MAX_CONVERSATION_LENGTH=50
+SESSION_TIMEOUT=3600
+
+# Security
+SECRET_KEY=your_secret_key_here
+ALLOWED_USERS=123456789,987654321  # Optional user whitelist
+```
+
+## DNS CONFIGURATION
+
+### Domain Setup (cryptomaltese.com)
+```dns
+# Telegram bot subdomain
+telegram.cryptomaltese.com.    IN  A       YOUR_SERVER_IP
+
+# Webhook endpoint
+telegram.cryptomaltese.com.    IN  A       YOUR_SERVER_IP
+```
+
+### SSL Certificate
+- **Let's Encrypt**: Automatic SSL certificate generation
+- **Cloudflare**: SSL termination and CDN
+- **Certificate Renewal**: Automatic renewal process
+
+## SCALABILITY CONSIDERATIONS
+
+### Horizontal Scaling
+- **Multiple Instances**: Run multiple bot instances
+- **Load Balancer**: Distribute webhook requests
+- **Shared Database**: Centralized user data
+- **Redis Cluster**: Distributed session storage
+
+### Performance Optimization
+- **Connection Pooling**: Reuse database connections
+- **Async Processing**: Non-blocking message handling
+- **Caching**: Cache frequent responses
+- **Message Queuing**: Handle high-volume periods
+
+## TESTING REQUIREMENTS
+
+### Unit Tests
+- **Bot Commands**: Test all bot commands
+- **API Integration**: Test AI system communication
+- **Session Management**: Test user session handling
+- **Rate Limiting**: Test rate limiting functionality
+
+### Integration Tests
+- **End-to-End**: Complete message flow testing
+- **Telegram API**: Test Telegram API integration
+- **Database Operations**: Test data persistence
+- **Error Scenarios**: Test error handling
+
+### Load Testing
+- **Concurrent Users**: Test with multiple users
+- **Message Volume**: Test high message throughput
+- **API Limits**: Test rate limiting under load
+- **Recovery**: Test system recovery after failures
+
+## MIGRATION FROM CURRENT SYSTEM
+
+### Data Migration
+- **User Data**: Export existing user information
+- **Conversation History**: Migrate chat histories
+- **Settings**: Transfer user preferences
+- **Statistics**: Preserve usage statistics
+
+### Bot Configuration
+- **Token Migration**: Update bot token if needed
+- **Webhook Setup**: Configure new webhook URL
+- **Model Configuration**: Update model references
+- **Rate Limits**: Adjust rate limiting settings
+
+## SUCCESS CRITERIA
+
+1. **Performance**: Response time < 3 seconds for user messages
+2. **Reliability**: 99.9% uptime with proper monitoring
+3. **Scalability**: Support for 1000+ concurrent users
+4. **User Experience**: Intuitive and responsive interface
+5. **Security**: Secure handling of user data and API keys
+6. **Monitoring**: Complete visibility into bot performance 

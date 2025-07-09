@@ -1,0 +1,460 @@
+# MAIL SERVICE SPECIFICATION
+# ===========================
+
+## PROJECT OVERVIEW
+Create a comprehensive email service that connects to the main AI core system via API to provide AI-powered email responses. The service should handle email monitoring, processing, and automated responses with professional formatting.
+
+## SYSTEM ARCHITECTURE
+
+### Core Components
+1. **Email Monitor**: IMAP client for monitoring incoming emails
+2. **Email Processor**: Parses and processes email content
+3. **AI Integration**: Communicates with main AI core system
+4. **Email Sender**: SMTP client for sending responses
+5. **Queue Manager**: Handles email processing queue
+6. **Template Engine**: Professional email response formatting
+7. **Spam Filter**: Basic spam detection and filtering
+
+### Integration Points
+- **Main AI System**: REST API calls for model inference
+- **IMAP Server**: Email monitoring and retrieval
+- **SMTP Server**: Email sending and delivery
+- **Database**: Email history and user management
+- **Redis**: Processing queue and caching
+
+## TECHNICAL REQUIREMENTS
+
+### Server Specifications (Infomaniak)
+- **Instance Type**: VPS Pro 4 or VPS Pro 8
+- **CPU**: 4-8 vCPUs (AMD EPYC or Intel Xeon)
+- **RAM**: 8-16 GB RAM
+- **Storage**: 100-200 GB SSD (for email storage)
+- **OS**: Ubuntu 22.04 LTS or Debian 12
+- **Network**: 1 Gbps bandwidth
+
+### Software Stack
+- **Python**: 3.10+
+- **FastAPI**: Web framework for API endpoints
+- **aiosmtplib**: Async SMTP client
+- **aioimaplib**: Async IMAP client
+- **PostgreSQL**: Email history and user data
+- **Redis**: Processing queue and caching
+- **Docker**: Containerization
+- **Nginx**: Reverse proxy
+
+### Dependencies
+- **aiohttp**: Async HTTP client for AI API
+- **email-validator**: Email validation
+- **jinja2**: Template engine for email formatting
+- **sqlalchemy**: Database ORM
+- **redis**: Redis client
+- **python-dotenv**: Environment management
+- **spamassassin**: Spam filtering (optional)
+
+## EMAIL FUNCTIONALITY
+
+### Core Features
+1. **Email Monitoring**: Real-time monitoring of incoming emails
+2. **AI Processing**: Send email content to AI system for analysis
+3. **Automated Responses**: Generate and send AI-powered responses
+4. **Email Threading**: Maintain conversation context
+5. **Attachment Handling**: Process and respond to attachments
+6. **Spam Filtering**: Filter out spam and unwanted emails
+7. **Rate Limiting**: Prevent abuse and manage costs
+
+### Email Processing Flow
+1. **Monitor Inbox**: Check for new emails every 30 seconds
+2. **Filter Emails**: Apply spam filters and validation
+3. **Extract Content**: Parse email body and attachments
+4. **Send to AI**: Forward content to main AI system
+5. **Generate Response**: Create AI-powered response
+6. **Format Email**: Apply professional email formatting
+7. **Send Response**: Deliver response via SMTP
+8. **Log Activity**: Record processing in database
+
+### Email Types Supported
+- **Plain Text**: Standard text emails
+- **HTML**: Rich HTML emails
+- **Attachments**: PDF, DOC, TXT, images
+- **Threaded**: Follow-up emails in conversations
+- **Bulk**: Multiple recipients (with rate limiting)
+
+## API INTEGRATION
+
+### Main AI System Communication
+```python
+# Example AI client for email service
+class EmailAIClient:
+    def __init__(self, api_url: str, api_key: str):
+        self.api_url = api_url
+        self.api_key = api_key
+        self.session = aiohttp.ClientSession()
+    
+    async def process_email(self, email_content: str, context: dict = None) -> dict:
+        # Send email content to AI system for processing
+        pass
+    
+    async def generate_response(self, question: str, email_context: dict) -> dict:
+        # Generate AI response for email
+        pass
+```
+
+### Request Format
+```json
+{
+  "model": "mistral-7b-instruct",
+  "prompt": "Email content here",
+  "max_tokens": 1500,
+  "temperature": 0.3,
+  "email_context": {
+    "sender": "user@example.com",
+    "subject": "Question about labor law",
+    "thread_id": "abc123",
+    "previous_messages": []
+  }
+}
+```
+
+### Response Format
+```json
+{
+  "response": "AI generated email response",
+  "model": "mistral-7b-instruct",
+  "tokens_used": 300,
+  "processing_time": 5.2,
+  "suggested_subject": "Re: Question about labor law"
+}
+```
+
+## EMAIL TEMPLATING
+
+### Professional Email Templates
+```html
+<!-- Standard Response Template -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>AI Assistant Response</title>
+</head>
+<body>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
+            <h2 style="color: #333;">Assistant IA Code du Travail</h2>
+        </div>
+        
+        <div style="padding: 20px;">
+            <p>Bonjour,</p>
+            
+            <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin: 20px 0;">
+                {{ ai_response }}
+            </div>
+            
+            <p>Cordialement,<br>
+            <strong>Assistant IA Code du Travail</strong><br>
+            ColonyLab</p>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; font-size: 12px; color: #666;">
+            <p><strong>Disclaimer :</strong> Cette réponse est fournie à titre informatif uniquement. 
+            Pour des conseils juridiques précis et personnalisés, consultez un avocat spécialisé en droit du travail.</p>
+        </div>
+    </div>
+</body>
+</html>
+```
+
+### Template Variables
+- `{{ ai_response }}`: AI-generated response content
+- `{{ sender_name }}`: Original sender's name
+- `{{ original_subject }}`: Original email subject
+- `{{ response_date }}`: Current date and time
+- `{{ thread_id }}`: Email thread identifier
+
+## EMAIL PROCESSING
+
+### Email Structure
+```python
+class EmailMessage:
+    message_id: str
+    thread_id: str
+    sender: str
+    recipient: str
+    subject: str
+    body_text: str
+    body_html: str
+    attachments: List[Attachment]
+    received_date: datetime
+    processed: bool
+    ai_response: str
+    response_sent: bool
+```
+
+### Processing Queue
+```redis
+# Email processing queue
+email:queue:pending -> List of email IDs to process
+email:queue:processing -> Currently processing emails
+email:queue:completed -> Successfully processed emails
+email:queue:failed -> Failed email processing
+
+# Email tracking
+email:{message_id}:status -> Processing status
+email:{message_id}:attempts -> Number of processing attempts
+email:{message_id}:last_attempt -> Last processing attempt time
+```
+
+### Rate Limiting
+- **Per Sender**: Limit responses per sender per hour
+- **Global**: Limit total emails processed per hour
+- **Burst Protection**: Handle sudden email volume spikes
+- **Queue Management**: Prioritize urgent emails
+
+## SECURITY FEATURES
+
+### Email Security
+- **SPF/DKIM**: Email authentication validation
+- **Spam Filtering**: Basic spam detection
+- **Attachment Scanning**: Virus scanning for attachments
+- **Content Filtering**: Filter inappropriate content
+- **Rate Limiting**: Prevent email abuse
+
+### API Security
+- **API Key Authentication**: Secure API key management
+- **Request Validation**: Validate all API requests
+- **Input Sanitization**: Clean email content
+- **Logging**: Comprehensive security logging
+
+### Privacy
+- **Data Encryption**: Encrypt sensitive email data
+- **Data Retention**: Configurable email retention policies
+- **GDPR Compliance**: User data deletion capabilities
+- **PII Protection**: Remove personal information from logs
+
+## MONITORING AND LOGGING
+
+### Metrics
+- **Email Volume**: Emails processed per hour/day
+- **Response Times**: Average AI processing time
+- **Success Rate**: Percentage of successful responses
+- **Queue Length**: Number of emails in processing queue
+- **Error Rates**: Failed email processing rate
+
+### Logging
+- **Email Processing**: Track all email processing activities
+- **AI API Calls**: Log all AI system interactions
+- **Error Tracking**: Detailed error logging with context
+- **Performance**: Response time and resource usage
+
+### Health Checks
+- **IMAP Status**: Email server connectivity
+- **SMTP Status**: Email sending capability
+- **AI API Status**: Main AI system connectivity
+- **Database Status**: Database connectivity
+- **Queue Status**: Processing queue health
+
+## DEPLOYMENT
+
+### Docker Configuration
+```yaml
+version: '3.8'
+services:
+  mail-service:
+    build: .
+    container_name: mail-service
+    restart: unless-stopped
+    environment:
+      - AI_API_URL=${AI_API_URL}
+      - AI_API_KEY=${AI_API_KEY}
+      - IMAP_HOST=${IMAP_HOST}
+      - IMAP_PORT=${IMAP_PORT}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - EMAIL_ADDRESS=${EMAIL_ADDRESS}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL}
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./logs:/app/logs
+      - ./email_data:/app/email_data
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - mail-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: mail-service-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - mail-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: mail-service-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=mail_service
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mail-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: mail-service-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - mail-service
+    networks:
+      - mail-network
+
+networks:
+  mail-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+  postgres_data:
+```
+
+### Environment Variables
+```bash
+# AI System Configuration
+AI_API_URL=https://ai-api.cryptomaltese.com
+AI_API_KEY=your_api_key_here
+DEFAULT_MODEL=mistral-7b-instruct
+
+# Email Configuration
+EMAIL_ADDRESS=ai@cryptomaltese.com
+EMAIL_PASSWORD=secure_email_password
+EMAIL_DOMAIN=cryptomaltese.com
+
+# IMAP Configuration
+IMAP_HOST=mail.cryptomaltese.com
+IMAP_PORT=993
+IMAP_SSL=true
+IMAP_FOLDER=INBOX
+
+# SMTP Configuration
+SMTP_HOST=mail.cryptomaltese.com
+SMTP_PORT=587
+SMTP_SSL=true
+SMTP_USERNAME=ai@cryptomaltese.com
+SMTP_PASSWORD=secure_email_password
+
+# Database Configuration
+DATABASE_URL=postgresql://user:password@postgres:5432/mail_service
+DB_USER=mail_service
+DB_PASSWORD=secure_password
+
+# Redis Configuration
+REDIS_URL=redis://redis:6379
+REDIS_PASSWORD=
+
+# Application Configuration
+DEBUG=false
+LOG_LEVEL=INFO
+EMAIL_CHECK_INTERVAL=30
+MAX_EMAILS_PER_HOUR=100
+MAX_ATTACHMENT_SIZE=10485760  # 10MB
+PROCESSING_TIMEOUT=300  # 5 minutes
+
+# Security
+SECRET_KEY=your_secret_key_here
+ALLOWED_SENDERS=*  # Allow all senders, or specify domains
+BLOCKED_SENDERS=spam@example.com,malware@example.com
+```
+
+## DNS CONFIGURATION
+
+### Domain Setup (cryptomaltese.com)
+```dns
+# Mail server records
+mail.cryptomaltese.com.        IN  A       YOUR_SERVER_IP
+cryptomaltese.com.             IN  MX  10  mail.cryptomaltese.com.
+
+# SPF record for email authentication
+cryptomaltese.com.             IN  TXT     "v=spf1 mx ~all"
+
+# DKIM record (if using DKIM)
+default._domainkey.cryptomaltese.com. IN TXT "v=DKIM1; k=rsa; p=YOUR_PUBLIC_KEY"
+
+# DMARC record
+_dmarc.cryptomaltese.com.      IN  TXT     "v=DMARC1; p=quarantine; rua=mailto:dmarc@cryptomaltese.com"
+```
+
+### SSL Certificate
+- **Let's Encrypt**: Automatic SSL certificate generation
+- **Cloudflare**: SSL termination and CDN
+- **Certificate Renewal**: Automatic renewal process
+
+## SCALABILITY CONSIDERATIONS
+
+### Horizontal Scaling
+- **Multiple Workers**: Run multiple email processing workers
+- **Load Balancing**: Distribute email processing across instances
+- **Shared Database**: Centralized email data storage
+- **Redis Cluster**: Distributed queue management
+
+### Performance Optimization
+- **Async Processing**: Non-blocking email processing
+- **Connection Pooling**: Reuse database and email connections
+- **Caching**: Cache frequent AI responses
+- **Batch Processing**: Process multiple emails in batches
+
+## TESTING REQUIREMENTS
+
+### Unit Tests
+- **Email Parsing**: Test email content extraction
+- **AI Integration**: Test AI system communication
+- **Template Rendering**: Test email template generation
+- **Queue Management**: Test processing queue functionality
+
+### Integration Tests
+- **End-to-End**: Complete email flow testing
+- **IMAP/SMTP**: Test email server integration
+- **Database Operations**: Test data persistence
+- **Error Scenarios**: Test error handling
+
+### Load Testing
+- **Email Volume**: Test high email throughput
+- **Concurrent Processing**: Test multiple email processing
+- **Queue Performance**: Test queue under load
+- **Recovery**: Test system recovery after failures
+
+## MIGRATION FROM CURRENT SYSTEM
+
+### Data Migration
+- **Email History**: Export existing email data
+- **User Settings**: Migrate user preferences
+- **Templates**: Transfer email templates
+- **Statistics**: Preserve usage statistics
+
+### Configuration Updates
+- **Email Settings**: Update email server configuration
+- **AI Integration**: Update AI system API endpoints
+- **Domain Configuration**: Update DNS and SSL settings
+- **Rate Limits**: Adjust processing rate limits
+
+## SUCCESS CRITERIA
+
+1. **Performance**: Email processing time < 5 minutes
+2. **Reliability**: 99.9% uptime with proper monitoring
+3. **Scalability**: Support for 1000+ emails per day
+4. **User Experience**: Professional and timely email responses
+5. **Security**: Secure handling of email data and API keys
+6. **Monitoring**: Complete visibility into email processing performance 
