@@ -1,0 +1,73 @@
+{
+  "models": {
+    "mistral-7b-instruct": {
+      "type": "transformers",
+      "path": "mistralai/Mistral-7B-Instruct-v0.3",
+      "format": "safetensor",
+      "device": "auto",
+      "quantization": "4bit",
+      "max_memory": "8GB",
+      "context_length": 4096,
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "max_tokens": 512
+    },
+    "llama-2-7b-chat": {
+      "type": "transformers",
+      "path": "meta-llama/Llama-2-7b-chat-hf",
+      "format": "safetensor",
+      "device": "auto",
+      "quantization": "4bit",
+      "max_memory": "8GB",
+      "context_length": 4096,
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "max_tokens": 512
+    },
+    "llama-2-7b-chat-gguf": {
+      "type": "gguf",
+      "path": "/models/llama-2-7b-chat.gguf",
+      "context_length": 4096,
+      "threads": 8,
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "max_tokens": 512
+    },
+    "mistral-7b-instruct-gguf": {
+      "type": "gguf",
+      "path": "/models/mistral-7b-instruct.gguf",
+      "context_length": 4096,
+      "threads": 8,
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "max_tokens": 512
+    },
+    "codellama-7b-instruct": {
+      "type": "transformers",
+      "path": "codellama/CodeLlama-7b-Instruct-hf",
+      "format": "safetensor",
+      "device": "auto",
+      "quantization": "4bit",
+      "max_memory": "8GB",
+      "context_length": 4096,
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "max_tokens": 512
+    },
+    "phi-2": {
+      "type": "transformers",
+      "path": "microsoft/phi-2",
+      "format": "safetensor",
+      "device": "auto",
+      "quantization": "4bit",
+      "max_memory": "4GB",
+      "context_length": 2048,
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "max_tokens": 512
+    }
+  },
+  "default_model": "mistral-7b-instruct",
+  "auto_load": true,
+  "memory_limit": "80%"
+} 

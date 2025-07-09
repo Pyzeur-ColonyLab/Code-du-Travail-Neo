@@ -1,0 +1,387 @@
+# ARCHITECTURE OVERVIEW - Code du Travail Neo
+# ===========================================
+
+## SYSTEM OVERVIEW
+
+Code du Travail Neo is a modern, scalable AI system architecture designed as three independent microservices that can be deployed separately on Infomaniak cloud infrastructure. The system provides AI-powered assistance for French labor law through multiple interfaces while maintaining high availability, security, and performance.
+
+## HIGH-LEVEL ARCHITECTURE
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  Main AI Core   │    │  Telegram Bot   │    │   Mail Service  │
+│     System      │    │    Service      │    │                 │
+│                 │    │                 │    │                 │
+│ • API Server    │    │ • Bot Handler   │    │ • Email Monitor │
+│ • Model Manager │    │ • Session Mgmt  │    │ • SMTP/IMAP     │
+│ • Redis Cache   │    │ • Rate Limiting │    │ • Templates     │
+│ • Health Check  │    │ • Webhook       │    │ • Queue Mgmt    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    ┌─────────────────┐
+                    │   Domain & DNS  │
+                    │ cryptomaltese.com│
+                    └─────────────────┘
+```
+
+## SERVICE ARCHITECTURE DETAILS
+
+### 1. MAIN AI CORE SYSTEM
+**Purpose**: Central API for running various AI models and serving other services
+
+**Domain**: ai-api.cryptomaltese.com
+**Server**: VPS Pro 4-8 (4-8 vCPUs, 16-32 GB RAM, 100-200 GB SSD)
+
+**Core Components**:
+- **Model Manager**: Handles loading, switching, and managing different AI models
+- **API Server**: FastAPI-based REST API for model inference
+- **Model Registry**: Configuration system for different model types
+- **Caching Layer**: Redis-based caching for responses and model weights
+- **Health Monitoring**: System health checks and metrics
+- **Authentication**: API key management and rate limiting
+
+**Supported Model Formats**:
+- GGUF (llama.cpp compatible)
+- SafeTensor (HuggingFace Transformers)
+- ONNX (optimized inference)
+- LoRA adapters (for fine-tuned models)
+
+**API Endpoints**:
+```
+POST /api/v1/generate    # Generate AI responses
+POST /api/v1/chat        # Chat with context
+GET  /api/v1/models      # List available models
+POST /api/v1/models/load # Load specific model
+POST /api/v1/models/unload # Unload model
+GET  /api/v1/health      # Health check
+GET  /api/v1/metrics     # System metrics
+```
+
+**Technology Stack**:
+- Python 3.10+
+- FastAPI (Web framework)
+- Uvicorn (ASGI server)
+- Redis (Caching and session management)
+- Docker (Containerization)
+- Nginx (Reverse proxy and SSL termination)
+- PyTorch 2.0+ (AI/ML framework)
+- Transformers 4.35+ (HuggingFace)
+- llama-cpp-python (GGUF models)
+
+### 2. TELEGRAM SERVICE
+**Purpose**: Lightweight Telegram bot service for AI-powered chat
+
+**Domain**: telegram.cryptomaltese.com
+**Server**: VPS Pro 2-4 (2-4 vCPUs, 4-8 GB RAM, 50-100 GB SSD)
+
+**Core Components**:
+- **Telegram Bot Handler**: Manages Telegram API interactions
+- **API Client**: Communicates with the main AI core system
+- **Session Manager**: Handles user conversations and context
+- **Message Queue**: Handles high-volume message processing
+- **Rate Limiter**: Prevents abuse and manages API quotas
+- **Webhook Handler**: Receives updates from Telegram
+
+**Bot Commands**:
+```
+/start     - Initialize bot and show welcome message
+/help      - Display help information and available commands
+/status    - Show current system status and model info
+/reset     - Clear conversation history and start fresh
+/models    - List available AI models
+/switch    - Switch to different AI model
+/settings  - Configure user preferences
+```
+
+**Technology Stack**:
+- Python 3.10+
+- FastAPI (Web framework for webhook handling)
+- python-telegram-bot 20.0+ (Telegram Bot API wrapper)
+- Redis (Session and cache management)
+- PostgreSQL (User data and conversation history)
+- Docker (Containerization)
+- Nginx (Reverse proxy)
+
+### 3. MAIL SERVICE
+**Purpose**: Comprehensive email processing system with AI integration
+
+**Domain**: mail.cryptomaltese.com
+**Server**: VPS Pro 4-8 (4-8 vCPUs, 8-16 GB RAM, 100-200 GB SSD)
+
+**Core Components**:
+- **Email Monitor**: IMAP client for monitoring incoming emails
+- **Email Processor**: Parses and processes email content
+- **AI Integration**: Communicates with main AI core system
+- **Email Sender**: SMTP client for sending responses
+- **Queue Manager**: Handles email processing queue
+- **Template Engine**: Professional email response formatting
+- **Spam Filter**: Basic spam detection and filtering
+
+**Email Processing Flow**:
+1. Monitor Inbox (check every 30 seconds)
+2. Filter Emails (spam filters and validation)
+3. Extract Content (parse email body and attachments)
+4. Send to AI (forward content to main AI system)
+5. Generate Response (create AI-powered response)
+6. Format Email (apply professional email formatting)
+7. Send Response (deliver response via SMTP)
+8. Log Activity (record processing in database)
+
+**Technology Stack**:
+- Python 3.10+
+- FastAPI (Web framework for API endpoints)
+- aiosmtplib (Async SMTP client)
+- aioimaplib (Async IMAP client)
+- PostgreSQL (Email history and user data)
+- Redis (Processing queue and caching)
+- Docker (Containerization)
+- Nginx (Reverse proxy)
+- Jinja2 (Template engine for email formatting)
+
+## NETWORK ARCHITECTURE
+
+### DNS Configuration (cryptomaltese.com)
+```dns
+# Main AI API
+ai-api.cryptomaltese.com.      IN  A       MAIN_SERVER_IP
+
+# Telegram Bot
+telegram.cryptomaltese.com.    IN  A       TELEGRAM_SERVER_IP
+
+# Mail Service
+mail.cryptomaltese.com.        IN  A       MAIL_SERVER_IP
+cryptomaltese.com.             IN  MX  10  mail.cryptomaltese.com.
+
+# Email authentication
+cryptomaltese.com.             IN  TXT     "v=spf1 mx ~all"
+```
+
+### SSL/TLS Configuration
+- **Let's Encrypt**: Automatic SSL certificate generation
+- **Cloudflare**: SSL termination and CDN
+- **Certificate Renewal**: Automatic renewal process
+- **HSTS**: HTTP Strict Transport Security headers
+
+## DATA FLOW ARCHITECTURE
+
+### 1. User Interaction Flow (Telegram)
+```
+User → Telegram → Webhook → Telegram Service → AI Core System → Response
+  ↓
+User ← Telegram ← Response ← Telegram Service ← AI Core System ← Generated
+```
+
+### 2. Email Processing Flow
+```
+Email → IMAP Server → Mail Service → AI Core System → Response
+  ↓
+Email ← SMTP Server ← Mail Service ← AI Core System ← Generated
+```
+
+### 3. API Integration Flow
+```
+Client → HTTPS → Nginx → FastAPI → AI Core System → Model → Response
+  ↓
+Client ← HTTPS ← Nginx ← FastAPI ← AI Core System ← Generated
+```
+
+## SECURITY ARCHITECTURE
+
+### Authentication & Authorization
+- **API Key Authentication**: Secure access to AI core system
+- **Rate Limiting**: Per-user and global rate limiting
+- **Input Validation**: Sanitize all user inputs
+- **IP Whitelisting**: Optional IP-based access control
+
+### Data Protection
+- **Data Encryption**: Encrypt sensitive data at rest and in transit
+- **Data Retention**: Configurable data retention policies
+- **GDPR Compliance**: User data deletion capabilities
+- **PII Protection**: Remove personal information from logs
+
+### Network Security
+- **Firewall Configuration**: UFW with minimal open ports
+- **SSL/TLS**: Encrypted communications
+- **SPF/DKIM**: Email authentication validation
+- **Spam Filtering**: Basic spam detection
+
+## SCALABILITY ARCHITECTURE
+
+### Horizontal Scaling
+- **Multiple Instances**: Run multiple service instances
+- **Load Balancer**: Distribute traffic across instances
+- **Shared Database**: Centralized data storage
+- **Redis Cluster**: Distributed session storage
+
+### Performance Optimization
+- **Connection Pooling**: Reuse database connections
+- **Async Processing**: Non-blocking operations
+- **Caching Strategy**: Redis-based response caching
+- **Queue Management**: Asynchronous processing
+
+### Resource Management
+- **Model Quantization**: Automatic quantization for memory efficiency
+- **Dynamic Loading**: Load/unload models based on demand
+- **Memory Monitoring**: Real-time memory usage tracking
+- **Auto-scaling**: Automatic scaling based on load
+
+## MONITORING & OBSERVABILITY
+
+### Health Checks
+- **Service Health**: Individual service status monitoring
+- **API Health**: Endpoint availability checks
+- **Database Health**: Connection and performance monitoring
+- **Redis Health**: Cache and session storage monitoring
+
+### Metrics Collection
+- **Performance Metrics**: Response times and throughput
+- **Resource Metrics**: CPU, memory, and disk usage
+- **Business Metrics**: User activity and model usage
+- **Error Metrics**: Error rates and failure tracking
+
+### Logging Strategy
+- **Structured Logging**: JSON-formatted logs
+- **Centralized Logging**: Aggregated log collection
+- **Log Levels**: Configurable logging verbosity
+- **Log Retention**: Configurable log retention policies
+
+## DEPLOYMENT ARCHITECTURE
+
+### Container Architecture
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Main AI Core  │    │  Telegram Bot   │    │   Mail Service  │
+│   Containers    │    │   Containers    │    │   Containers    │
+│                 │    │                 │    │                 │
+│ • ai-api        │    │ • telegram-bot  │    │ • mail-service  │
+│ • redis         │    │ • redis         │    │ • redis         │
+│ • nginx         │    │ • postgres      │    │ • postgres      │
+│ • models        │    │ • nginx         │    │ • nginx         │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+### Environment Configuration
+- **Environment Variables**: Secure configuration management
+- **Docker Compose**: Multi-container orchestration
+- **Volume Mounts**: Persistent data storage
+- **Network Isolation**: Service-specific networks
+
+## INTEGRATION ARCHITECTURE
+
+### API Integration
+All services communicate with the Main AI Core System via REST API:
+
+**Request Format**:
+```json
+{
+  "model": "mistral-7b-instruct",
+  "prompt": "User question here",
+  "max_tokens": 512,
+  "temperature": 0.7,
+  "top_p": 0.9,
+  "stream": false
+}
+```
+
+**Response Format**:
+```json
+{
+  "response": "AI generated response",
+  "model": "mistral-7b-instruct",
+  "tokens_used": 150,
+  "processing_time": 2.5,
+  "timestamp": "2024-01-01T12:00:00Z"
+}
+```
+
+### Service Communication
+- **Synchronous**: Direct API calls for immediate responses
+- **Asynchronous**: Queue-based processing for batch operations
+- **Event-Driven**: Webhook-based notifications
+- **Caching**: Redis-based response caching
+
+## FAILOVER & DISASTER RECOVERY
+
+### High Availability
+- **Service Redundancy**: Multiple service instances
+- **Database Replication**: Primary-secondary database setup
+- **Load Balancing**: Traffic distribution across instances
+- **Health Monitoring**: Automatic failover detection
+
+### Backup Strategy
+- **Database Backups**: Regular automated backups
+- **Configuration Backups**: Version-controlled configurations
+- **SSL Certificate Backups**: Certificate storage and renewal
+- **Disaster Recovery**: Complete system recovery procedures
+
+### Recovery Procedures
+- **Service Recovery**: Automatic service restart
+- **Data Recovery**: Database restoration procedures
+- **Configuration Recovery**: Configuration file restoration
+- **Communication Recovery**: Service communication restoration
+
+## PERFORMANCE ARCHITECTURE
+
+### Response Time Targets
+- **API Response**: < 2 seconds for standard requests
+- **Telegram Response**: < 3 seconds for user messages
+- **Email Processing**: < 5 minutes for email responses
+- **Model Loading**: < 30 seconds for model switching
+
+### Throughput Capacity
+- **Concurrent Users**: Support for 1000+ concurrent users
+- **API Requests**: 100+ requests per minute
+- **Email Processing**: 1000+ emails per day
+- **Model Inference**: 50+ concurrent model requests
+
+### Resource Optimization
+- **Memory Management**: Efficient model memory usage
+- **CPU Optimization**: Multi-threading and async processing
+- **Storage Optimization**: Compressed model storage
+- **Network Optimization**: Connection pooling and caching
+
+## DEVELOPMENT & DEPLOYMENT WORKFLOW
+
+### Development Phases
+1. **Phase 1**: Main AI Core System (Foundation)
+2. **Phase 2**: Telegram Service (Lightweight testing)
+3. **Phase 3**: Mail Service (Complex integration)
+
+### Testing Strategy
+- **Unit Tests**: Individual component testing
+- **Integration Tests**: Service-to-service communication
+- **Load Tests**: Performance under high traffic
+- **Security Tests**: Vulnerability assessment
+
+### Deployment Pipeline
+- **Development**: Local development environment
+- **Staging**: Pre-production testing environment
+- **Production**: Live production environment
+- **Monitoring**: Continuous monitoring and alerting
+
+## SUCCESS METRICS
+
+### Performance Metrics
+- **Uptime**: 99.9% system availability
+- **Response Time**: < 3 seconds average response time
+- **Throughput**: 1000+ concurrent users supported
+- **Error Rate**: < 1% error rate
+
+### Business Metrics
+- **User Satisfaction**: High user engagement and satisfaction
+- **System Reliability**: Stable and predictable performance
+- **Scalability**: Easy horizontal scaling
+- **Security**: No security vulnerabilities
+
+### Technical Metrics
+- **Code Quality**: High test coverage and code standards
+- **Documentation**: Comprehensive documentation
+- **Monitoring**: Complete system observability
+- **Maintainability**: Easy system maintenance and updates
+
+---
+
+**Architecture designed for scalability, security, and performance**
+**Built with modern microservices principles and cloud-native technologies** 
