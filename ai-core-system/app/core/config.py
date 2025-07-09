@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     log_file: str = Field(default="logs/app.log", env="LOG_FILE")
     secret_key: str = Field(default="your-secret-key-here", env="SECRET_KEY")
     allowed_hosts: str = Field(default="*", env="ALLOWED_HOSTS")
+    huggingface_token: str | None = None  # Add this line to accept the Hugging Face token from env
     
     @validator("allowed_origins", pre=True)
     def parse_allowed_origins(cls, v):
@@ -104,6 +105,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "forbid"
 
 
 # Global settings instance
