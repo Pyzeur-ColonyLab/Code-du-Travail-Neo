@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     enable_swagger_ui: bool = Field(default=True, env="ENABLE_SWAGGER_UI")
     enable_redoc: bool = Field(default=True, env="ENABLE_REDOC")
     
+    # Additional fields from .env file
+    log_file: str = Field(default="logs/app.log", env="LOG_FILE")
+    secret_key: str = Field(default="your-secret-key-here", env="SECRET_KEY")
+    allowed_hosts: str = Field(default="*", env="ALLOWED_HOSTS")
+    
     @validator("allowed_origins", pre=True)
     def parse_allowed_origins(cls, v):
         """Parse allowed origins from string to list."""
