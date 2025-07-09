@@ -1,17 +1,5 @@
 {
   "models": {
-    "code-du-travail-mistral": {
-      "type": "transformers",
-      "path": "Pyzeur/Code-du-Travail-mistral-finetune",
-      "format": "safetensor",
-      "device": "auto",
-      "quantization": "4bit",
-      "max_memory": "8GB",
-      "context_length": 4096,
-      "temperature": 0.7,
-      "top_p": 0.9,
-      "max_tokens": 512
-    },
     "mistral-7b-instruct": {
       "type": "transformers",
       "path": "mistralai/Mistral-7B-Instruct-v0.2",
@@ -23,9 +11,33 @@
       "temperature": 0.7,
       "top_p": 0.9,
       "max_tokens": 512
+    },
+    "phi-2": {
+      "type": "transformers",
+      "path": "microsoft/phi-2",
+      "format": "safetensor",
+      "device": "auto",
+      "quantization": "4bit",
+      "max_memory": "4GB",
+      "context_length": 2048,
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "max_tokens": 512
+    },
+    "tiny-llama": {
+      "type": "transformers",
+      "path": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+      "format": "safetensor",
+      "device": "auto",
+      "quantization": "4bit",
+      "max_memory": "2GB",
+      "context_length": 2048,
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "max_tokens": 512
     }
   },
-  "default_model": "code-du-travail-mistral",
+  "default_model": "phi-2",
   "model_cache_dir": "/app/cache",
   "model_load_timeout": 300,
   "model_unload_timeout": 60

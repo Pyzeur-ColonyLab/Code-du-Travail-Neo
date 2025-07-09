@@ -11,6 +11,11 @@ from typing import List, Dict, Any, Optional
 import time
 import json
 import os
+import logging
+
+from ..core.model_manager import model_manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["AI Core System"])
 
@@ -18,7 +23,7 @@ router = APIRouter(prefix="/api/v1", tags=["AI Core System"])
 # Request/Response Models
 class ChatRequest(BaseModel):
     message: str
-    model: str = "code-du-travail-mistral"
+    model: str = "phi-2"
     temperature: Optional[float] = 0.7
     max_tokens: Optional[int] = 512
     top_p: Optional[float] = 0.9
@@ -74,46 +79,8 @@ async def health_check():
 async def list_models():
     """List all available models."""
     try:
-        # Read models configuration
-        config_path = "config/models.json"
-        if not os.path.exists(config_path):
-            # Return default models if config doesn't exist
-            models = [
-                ModelInfo(
-                    name="code-du-travail-mistral",
-                    type="transformers",
-                    path="Pyzeur/Code-du-Travail-mistral-finetune",
-                    format="safetensor",
-                    device="auto",
-                    quantization="4bit",
-                    context_length=4096,
-                    temperature=0.7,
-                    top_p=0.9,
-                    max_tokens=512,
-                    loaded=False
-                ),
-                ModelInfo(
-                    name="mistral-7b-instruct",
-                    type="transformers",
-                    path="mistralai/Mistral-7B-Instruct-v0.2",
-                    format="safetensor",
-                    device="auto",
-                    quantization="4bit",
-                    context_length=4096,
-                    temperature=0.7,
-                    top_p=0.9,
-                    max_tokens=512,
-                    loaded=False
-                )
-            ]
-            return ModelListResponse(
-                models=models,
-                default_model="code-du-travail-mistral",
-                total_models=len(models)
-            )
-        
-        with open(config_path, 'r') as f:
-            config = json.load(f)
+        # Load model configurations
+        config = model_manager.load_config()
         
         models = []
         for name, model_config in config.get("models", {}).items():
@@ -128,39 +95,46 @@ async def list_models():
                 temperature=model_config.get("temperature", 0.7),
                 top_p=model_config.get("top_p", 0.9),
                 max_tokens=model_config.get("max_tokens", 512),
-                loaded=False  # For now, always false
+                loaded=model_manager.is_model_loaded(name)
             ))
         
         return ModelListResponse(
             models=models,
-            default_model=config.get("default_model", "code-du-travail-mistral"),
+            default_model=config.get("default_model", "mistral-7b-instruct"),
             total_models=len(models)
         )
         
     except Exception as e:
+        logger.error(f"Failed to list models: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to load models: {str(e)}")
 
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """Chat endpoint for AI model interaction."""
-    start_time = time.time()
-    
     try:
-        # For now, return a simple response
-        # Later this will integrate with the actual AI model
-        response_text = f"AI Model '{request.model}' received: {request.message}"
+        logger.info(f"Chat request received for model '{request.model}': {request.message[:100]}...")
         
-        processing_time = time.time() - start_time
+        # Generate response using the model manager
+        result = model_manager.generate_response(
+            model_name=request.model,
+            prompt=request.message,
+            max_tokens=request.max_tokens,
+            temperature=request.temperature,
+            top_p=request.top_p
+        )
+        
+        logger.info(f"Generated response in {result['processing_time']:.2f}s with {result['tokens_used']} tokens")
         
         return ChatResponse(
-            response=response_text,
-            model=request.model,
-            processing_time=processing_time,
-            tokens_used=len(request.message.split())  # Simple token estimation
+            response=result["response"],
+            model=result["model"],
+            processing_time=result["processing_time"],
+            tokens_used=result["tokens_used"]
         )
         
     except Exception as e:
+        logger.error(f"Chat failed: {e}")
         raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
 
 
@@ -168,13 +142,8 @@ async def chat(request: ChatRequest):
 async def get_model_info(model_name: str):
     """Get information about a specific model."""
     try:
-        # Read models configuration
-        config_path = "config/models.json"
-        if not os.path.exists(config_path):
-            raise HTTPException(status_code=404, detail="Model configuration not found")
-        
-        with open(config_path, 'r') as f:
-            config = json.load(f)
+        # Load model configurations
+        config = model_manager.load_config()
         
         if model_name not in config.get("models", {}):
             raise HTTPException(status_code=404, detail=f"Model '{model_name}' not found")
@@ -192,12 +161,13 @@ async def get_model_info(model_name: str):
             temperature=model_config.get("temperature", 0.7),
             top_p=model_config.get("top_p", 0.9),
             max_tokens=model_config.get("max_tokens", 512),
-            loaded=False  # For now, always false
+            loaded=model_manager.is_model_loaded(model_name)
         )
         
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Failed to get model info for '{model_name}': {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get model info: {str(e)}")
 
 
@@ -205,15 +175,25 @@ async def get_model_info(model_name: str):
 async def load_model(model_name: str):
     """Load a specific model."""
     try:
-        # For now, just return success
-        # Later this will actually load the model
-        return {
-            "message": f"Model '{model_name}' load request received",
-            "model": model_name,
-            "status": "pending"
-        }
+        logger.info(f"Loading model '{model_name}'...")
         
+        success = model_manager.load_model(model_name)
+        
+        if success:
+            logger.info(f"Successfully loaded model '{model_name}'")
+            return {
+                "message": f"Model '{model_name}' loaded successfully",
+                "model": model_name,
+                "status": "loaded",
+                "loaded_at": time.time()
+            }
+        else:
+            raise HTTPException(status_code=500, detail=f"Failed to load model '{model_name}'")
+        
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Failed to load model '{model_name}': {e}")
         raise HTTPException(status_code=500, detail=f"Failed to load model: {str(e)}")
 
 
@@ -221,30 +201,50 @@ async def load_model(model_name: str):
 async def unload_model(model_name: str):
     """Unload a specific model."""
     try:
-        # For now, just return success
-        # Later this will actually unload the model
-        return {
-            "message": f"Model '{model_name}' unload request received",
-            "model": model_name,
-            "status": "pending"
-        }
+        logger.info(f"Unloading model '{model_name}'...")
         
+        success = model_manager.unload_model(model_name)
+        
+        if success:
+            logger.info(f"Successfully unloaded model '{model_name}'")
+            return {
+                "message": f"Model '{model_name}' unloaded successfully",
+                "model": model_name,
+                "status": "unloaded",
+                "unloaded_at": time.time()
+            }
+        else:
+            raise HTTPException(status_code=500, detail=f"Failed to unload model '{model_name}'")
+        
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Failed to unload model '{model_name}': {e}")
         raise HTTPException(status_code=500, detail=f"Failed to unload model: {str(e)}")
 
 
 @router.get("/status")
 async def get_status():
     """Get system status."""
-    return {
-        "status": "running",
-        "service": "ai-core-system",
-        "version": "1.0.0",
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "endpoints": {
-            "health": "/api/v1/health",
-            "models": "/api/v1/models",
-            "chat": "/api/v1/chat",
-            "status": "/api/v1/status"
+    try:
+        # Get loaded models
+        loaded_models = model_manager.get_loaded_models()
+        
+        return {
+            "status": "running",
+            "service": "ai-core-system",
+            "version": "1.0.0",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "device": model_manager.device,
+            "loaded_models": loaded_models,
+            "total_loaded_models": len(loaded_models),
+            "endpoints": {
+                "health": "/api/v1/health",
+                "models": "/api/v1/models",
+                "chat": "/api/v1/chat",
+                "status": "/api/v1/status"
+            }
         }
-    } 
+    except Exception as e:
+        logger.error(f"Failed to get status: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}") 
