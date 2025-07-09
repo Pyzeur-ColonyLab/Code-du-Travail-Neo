@@ -4,11 +4,13 @@ uvicorn[standard]==0.24.0
 pydantic==2.5.0
 pydantic-settings==2.1.0
 
-# AI/ML Libraries (minimal for testing)
-torch==2.1.1
+# Core Dependencies
+numpy==1.24.3
+scipy==1.11.4
+
+# AI/ML Libraries
 transformers==4.36.0
 accelerate==0.25.0
-bitsandbytes==0.41.1
 safetensors==0.4.0
 
 # Redis

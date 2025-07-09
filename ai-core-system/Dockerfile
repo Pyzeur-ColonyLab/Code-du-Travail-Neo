@@ -23,7 +23,10 @@ WORKDIR /app
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies with verbose output
+# Install PyTorch CPU version first
+RUN pip install --no-cache-dir torch==2.1.1+cpu torchvision==0.16.1+cpu torchaudio==2.1.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+
+# Install other Python dependencies
 RUN pip install --no-cache-dir --verbose -r requirements.txt
 
 # Copy application code

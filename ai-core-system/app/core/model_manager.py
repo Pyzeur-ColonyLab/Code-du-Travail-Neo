@@ -244,7 +244,13 @@ class ModelManager:
             
         except Exception as e:
             logger.error(f"Failed to generate response with model '{model_name}': {e}")
-            raise
+            # Provide more specific error messages
+            if "numpy" in str(e).lower():
+                raise Exception(f"NumPy compatibility issue: {e}. Please check NumPy installation.")
+            elif "torch" in str(e).lower():
+                raise Exception(f"PyTorch issue: {e}. Please check PyTorch installation.")
+            else:
+                raise Exception(f"Model inference failed: {e}")
     
     def get_loaded_models(self) -> List[str]:
         """Get list of currently loaded models."""
