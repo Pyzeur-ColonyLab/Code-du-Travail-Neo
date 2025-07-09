@@ -6,6 +6,7 @@ necessary middleware, routes, and startup/shutdown events.
 """
 
 import time
+import os
 from contextlib import asynccontextmanager
 from typing import Dict, Any
 
@@ -18,8 +19,6 @@ import uvicorn
 from app.core.config import get_settings
 from app.core.logging import get_logger, log_request
 from app.api.routes import router as api_router
-from app.models.manager import get_model_manager
-from app.utils.redis_client import get_redis_client
 
 logger = get_logger(__name__)
 
@@ -33,23 +32,6 @@ async def lifespan(app: FastAPI):
     logger.info("Starting AI Core System", version="1.0.0")
     
     try:
-        # Initialize Redis connection
-        redis_client = await get_redis_client()
-        await redis_client.connect()
-        logger.info("Redis connection established")
-        
-        # Initialize model manager
-        model_manager = await get_model_manager()
-        
-        # Load default model if specified
-        if settings.default_model:
-            logger.info("Loading default model", model=settings.default_model)
-            success = await model_manager.load_model(settings.default_model)
-            if success:
-                logger.info("Default model loaded successfully", model=settings.default_model)
-            else:
-                logger.warning("Failed to load default model", model=settings.default_model)
-        
         logger.info("AI Core System started successfully")
         
     except Exception as e:
@@ -62,11 +44,6 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down AI Core System")
     
     try:
-        # Close Redis connection
-        redis_client = await get_redis_client()
-        await redis_client.disconnect()
-        logger.info("Redis connection closed")
-        
         logger.info("AI Core System shutdown complete")
         
     except Exception as e:
@@ -112,11 +89,6 @@ def create_app() -> FastAPI:
         # Get user agent
         user_agent = request.headers.get("user-agent", "unknown")
         
-        # Get API key (masked)
-        api_key_header = settings.api_key_header
-        api_key = request.headers.get(api_key_header, "")
-        masked_api_key = api_key[:8] + "..." if len(api_key) > 8 else "***"
-        
         # Process request
         try:
             response = await call_next(request)
@@ -131,7 +103,7 @@ def create_app() -> FastAPI:
                 processing_time,
                 client_ip,
                 user_agent,
-                masked_api_key,
+                "***",
             )
             
             return response
@@ -148,7 +120,7 @@ def create_app() -> FastAPI:
                 processing_time,
                 client_ip,
                 user_agent,
-                masked_api_key,
+                "***",
             )
             
             raise
@@ -198,54 +170,25 @@ def create_app() -> FastAPI:
     # Include API routes
     app.include_router(api_router)
     
-    # Add root endpoint
+    # Root endpoint
     @app.get("/")
     async def root():
-        """Root endpoint with API information."""
+        """Root endpoint."""
         return {
-            "name": "AI Core System",
+            "message": "AI Core System is running!",
             "version": "1.0.0",
-            "description": "Modular AI Core System for Model Management and API Services",
-            "status": "running",
-            "endpoints": {
-                "api": "/api/v1",
-                "docs": "/docs",
-                "health": "/api/v1/health",
-            },
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "status": "healthy"
         }
     
-    # Add health check endpoint (no authentication required)
+    # Health check endpoint
     @app.get("/health")
     async def health_check():
-        """Basic health check endpoint."""
-        try:
-            # Check Redis
-            redis_client = await get_redis_client()
-            redis_healthy = await redis_client.health_check()
-            
-            # Check model manager
-            model_manager = await get_model_manager()
-            model_manager_health = await model_manager.health_check()
-            
-            status = "healthy" if redis_healthy and model_manager_health["status"] == "healthy" else "unhealthy"
-            
-            return {
-                "status": status,
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "services": {
-                    "redis": "healthy" if redis_healthy else "unhealthy",
-                    "model_manager": model_manager_health["status"],
-                }
-            }
-            
-        except Exception as e:
-            logger.error("Health check failed", error=str(e))
-            return {
-                "status": "unhealthy",
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "error": str(e),
-            }
+        """Health check endpoint."""
+        return {
+            "status": "healthy",
+            "service": "ai-core-system",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
     
     return app
 
@@ -256,14 +199,10 @@ app = create_app()
 
 if __name__ == "__main__":
     settings = get_settings()
-    
-    # Run the application
     uvicorn.run(
         "main:app",
         host=settings.api_host,
         port=settings.api_port,
-        reload=settings.reload_on_change,
+        reload=settings.debug,
         workers=settings.api_workers,
-        log_level=settings.log_level.lower(),
-        access_log=True,
     ) 
