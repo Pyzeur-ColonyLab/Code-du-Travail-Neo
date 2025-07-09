@@ -6,22 +6,25 @@ Your AI Core System is now fully functional with real AI model inference capabil
 
 ## 📋 Available Models
 
-The system is configured with three models:
+The system is configured with three models optimized for CPU-only servers:
 
-1. **`phi-2`** (Default) - Microsoft's Phi-2 model (2.7B parameters)
-   - Fast and efficient
-   - Good for general tasks
-   - Memory usage: ~4GB
-
-2. **`tiny-llama`** - TinyLlama 1.1B Chat model
-   - Very lightweight
-   - Good for simple tasks
+1. **`tiny-llama`** (Default) - TinyLlama 1.1B Chat model
+   - Very lightweight and fast
+   - Perfect for CPU-only servers
    - Memory usage: ~2GB
+   - Best choice for testing and simple tasks
+
+2. **`phi-2`** - Microsoft's Phi-2 model (2.7B parameters)
+   - Good balance of quality and speed
+   - Works well on CPU
+   - Memory usage: ~4GB
+   - Good for general tasks
 
 3. **`mistral-7b-instruct`** - Mistral 7B Instruct model
-   - High quality responses
+   - Highest quality responses
    - More resource intensive
    - Memory usage: ~8GB
+   - Best for complex tasks (if you have enough RAM)
 
 ## 🔧 API Endpoints
 
@@ -90,7 +93,7 @@ You'll see all available models and their loading status.
 ```json
 {
   "message": "Hello! Can you explain what artificial intelligence is?",
-  "model": "phi-2",
+  "model": "tiny-llama",
   "temperature": 0.7,
   "max_tokens": 256
 }
@@ -111,14 +114,14 @@ python test_ai_api.py
 curl -X GET "https://cryptomaltese.com/api/v1/models"
 
 # Load a model
-curl -X POST "https://cryptomaltese.com/api/v1/models/phi-2/load"
+curl -X POST "https://cryptomaltese.com/api/v1/models/tiny-llama/load"
 
 # Chat with AI
 curl -X POST "https://cryptomaltese.com/api/v1/chat" \
   -H "Content-Type: application/json" \
   -d '{
     "message": "What is the capital of France?",
-    "model": "phi-2",
+    "model": "tiny-llama",
     "temperature": 0.7,
     "max_tokens": 256
   }'
@@ -132,16 +135,18 @@ Edit `config/models.json` to modify model configurations:
 ```json
 {
   "models": {
-    "phi-2": {
+    "tiny-llama": {
       "type": "transformers",
-      "path": "microsoft/phi-2",
-      "quantization": "4bit",
-      "max_memory": "4GB",
+      "path": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+      "device": "cpu",
+      "quantization": "none",
+      "max_memory": "2GB",
       "temperature": 0.7,
       "max_tokens": 512
     }
   }
 }
+```
 ```
 
 ### Environment Variables
@@ -150,12 +155,13 @@ Key environment variables in your `.env` file:
 ```bash
 # Model Configuration
 MODEL_CACHE_DIR=/app/cache
-DEFAULT_MODEL=phi-2
+DEFAULT_MODEL=tiny-llama
 MODEL_LOAD_TIMEOUT=300
 
 # Performance
 MAX_MODEL_MEMORY_GB=16
-MODEL_QUANTIZATION=4bit
+MODEL_QUANTIZATION=none
+```
 ```
 
 ## 🔍 Troubleshooting
@@ -166,9 +172,10 @@ MODEL_QUANTIZATION=4bit
 3. **Permission Errors**: Ensure the cache directory is writable
 
 ### Performance Optimization
-1. **Use 4-bit quantization** (already enabled)
+1. **Use CPU-optimized models** (already configured)
 2. **Load smaller models** for faster responses
 3. **Unload unused models** to free memory
+4. **Start with tiny-llama** for testing
 
 ### Common Error Messages
 - `"Model not found"`: Check the model name in `/api/v1/models`
