@@ -14,7 +14,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-DOMAIN="ai-api.cryptomaltese.com"
+DOMAIN="ai.cryptomaltese.com"
 EMAIL="admin@cryptomaltese.com"
 APP_DIR="/opt/ai-core-system"
 CURRENT_DIR="$(pwd)"

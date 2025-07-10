@@ -29,13 +29,13 @@ In your domain registrar or DNS provider (Cloudflare, etc.), add these records:
 ```dns
 # Main AI API subdomain
 Type: A
-Name: ai-api
+Name: ai
 Value: YOUR_SERVER_IP
 TTL: 300
 
 # Optional: www subdomain for the API
 Type: A
-Name: www.ai-api
+Name: www.ai
 Value: YOUR_SERVER_IP
 TTL: 300
 ```
@@ -43,8 +43,8 @@ TTL: 300
 ### 1.3 Verify DNS Propagation
 ```bash
 # Check if DNS is propagating
-dig ai-api.cryptomaltese.com
-host ai-api.cryptomaltese.com
+dig ai.cryptomaltese.com
+host ai.cryptomaltese.com
 
 # Wait for propagation (can take up to 24 hours)
 # Usually takes 5-15 minutes for most providers
@@ -116,7 +116,7 @@ SSL_CERT_PATH=/etc/nginx/ssl/cert.pem
 SSL_KEY_PATH=/etc/nginx/ssl/key.pem
 
 # Domain Configuration
-DOMAIN=ai-api.cryptomaltese.com
+DOMAIN=ai.cryptomaltese.com
 EMAIL=admin@cryptomaltese.com
 
 # Performance Configuration
@@ -221,7 +221,7 @@ sudo ./deploy_infomaniak.sh
 
 ```bash
 # 1. Verify DNS is working
-dig ai-api.cryptomaltese.com
+dig ai.cryptomaltese.com
 # Should return your server IP
 
 # 2. Clone and deploy
@@ -256,11 +256,11 @@ docker-compose logs -f
 curl http://localhost/health
 
 # Test with domain (after DNS setup)
-curl https://ai-api.cryptomaltese.com/health
+curl https://ai.cryptomaltese.com/health
 
 # Test API with key
 curl -H "X-API-Key: your-api-key" \
-     https://ai-api.cryptomaltese.com/api/v1/models
+     https://ai.cryptomaltese.com/api/v1/models
 ```
 
 ## 🚨 Troubleshooting
@@ -268,11 +268,11 @@ curl -H "X-API-Key: your-api-key" \
 ### DNS Issues
 ```bash
 # Check DNS propagation
-dig ai-api.cryptomaltese.com
-host ai-api.cryptomaltese.com
+dig ai.cryptomaltese.com
+host ai.cryptomaltese.com
 
 # Check if domain resolves to your IP
-host ai-api.cryptomaltese.com
+host ai.cryptomaltese.com
 ```
 
 ### SSL Certificate Issues
@@ -281,7 +281,7 @@ host ai-api.cryptomaltese.com
 certbot certificates
 
 # Test SSL connection
-openssl s_client -connect ai-api.cryptomaltese.com:443
+openssl s_client -connect ai.cryptomaltese.com:443
 
 # Renew certificates manually
 certbot renew
