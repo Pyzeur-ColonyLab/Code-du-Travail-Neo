@@ -104,9 +104,10 @@ class ModelManager:
                 logger.warning("4-bit quantization requires GPU. Falling back to CPU without quantization.")
                 config["quantization"] = "none"
             
-            # Load tokenizer
+            # Load tokenizer from base model (not adapter) if adapter is used
+            tokenizer_path = config["path"]
             tokenizer = AutoTokenizer.from_pretrained(
-                config["path"],
+                tokenizer_path,
                 cache_dir=self.cache_dir,
                 trust_remote_code=True,
                 token=self.hf_token
