@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     log_file: str = Field(default="logs/app.log", env="LOG_FILE")
     secret_key: str = Field(default="your-secret-key-here", env="SECRET_KEY")
     allowed_hosts: str = Field(default="*", env="ALLOWED_HOSTS")
-    huggingface_token: str | None = None  # Add this line to accept the Hugging Face token from env
+    huggingface_token: Optional[str] = Field(default=None, env="HUGGINGFACE_TOKEN")
     
     # SSL Configuration (optional)
     ssl_enabled: bool = Field(default=False, env="SSL_ENABLED")
