@@ -19,6 +19,11 @@ from transformers import (
     BitsAndBytesConfig,
     pipeline
 )
+# Add PEFT import
+try:
+    from peft import PeftModel
+except ImportError:
+    PeftModel = None
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +92,6 @@ class ModelManager:
             config = self.model_configs[model_name]
             logger.info(f"Loading model '{model_name}' with config: {config}")
             
-            # Set up quantization if specified and GPU is available
             quantization_config = None
             if config.get("quantization") == "4bit" and self.device == "cuda":
                 quantization_config = BitsAndBytesConfig(
@@ -98,7 +102,6 @@ class ModelManager:
                 )
             elif config.get("quantization") == "4bit" and self.device == "cpu":
                 logger.warning("4-bit quantization requires GPU. Falling back to CPU without quantization.")
-                # Remove quantization for CPU
                 config["quantization"] = "none"
             
             # Load tokenizer
@@ -108,36 +111,63 @@ class ModelManager:
                 trust_remote_code=True,
                 token=self.hf_token
             )
-            
-            # Add padding token if not present
             if tokenizer.pad_token is None:
                 tokenizer.pad_token = tokenizer.eos_token
             
-            # Load model with CPU optimizations
-            if self.device == "cpu":
-                # For CPU, use float32 and load to CPU directly
-                model = AutoModelForCausalLM.from_pretrained(
-                    config["path"],
+            # Load model (with or without adapter)
+            if "adapter" in config and config["adapter"]:
+                if PeftModel is None:
+                    raise ImportError("peft library is required for adapter/LoRA support. Please install with 'pip install peft'.")
+                # Load base model
+                if self.device == "cpu":
+                    base_model = AutoModelForCausalLM.from_pretrained(
+                        config["path"],
+                        cache_dir=self.cache_dir,
+                        torch_dtype=torch.float32,
+                        device_map=None,
+                        trust_remote_code=True,
+                        low_cpu_mem_usage=True,
+                        token=self.hf_token
+                    ).to("cpu")
+                else:
+                    base_model = AutoModelForCausalLM.from_pretrained(
+                        config["path"],
+                        quantization_config=quantization_config,
+                        cache_dir=self.cache_dir,
+                        torch_dtype=torch.float16,
+                        device_map="auto",
+                        trust_remote_code=True,
+                        token=self.hf_token
+                    )
+                # Load adapter on top
+                model = PeftModel.from_pretrained(
+                    base_model,
+                    config["adapter"],
                     cache_dir=self.cache_dir,
-                    torch_dtype=torch.float32,
-                    device_map=None,
-                    trust_remote_code=True,
-                    low_cpu_mem_usage=True,
-                    token=self.hf_token
-                ).to("cpu")
-            else:
-                # For GPU, use the original approach
-                model = AutoModelForCausalLM.from_pretrained(
-                    config["path"],
-                    quantization_config=quantization_config,
-                    cache_dir=self.cache_dir,
-                    torch_dtype=torch.float16,
-                    device_map="auto",
-                    trust_remote_code=True,
                     token=self.hf_token
                 )
-            
-            # Create pipeline with CPU optimizations
+            else:
+                if self.device == "cpu":
+                    model = AutoModelForCausalLM.from_pretrained(
+                        config["path"],
+                        cache_dir=self.cache_dir,
+                        torch_dtype=torch.float32,
+                        device_map=None,
+                        trust_remote_code=True,
+                        low_cpu_mem_usage=True,
+                        token=self.hf_token
+                    ).to("cpu")
+                else:
+                    model = AutoModelForCausalLM.from_pretrained(
+                        config["path"],
+                        quantization_config=quantization_config,
+                        cache_dir=self.cache_dir,
+                        torch_dtype=torch.float16,
+                        device_map="auto",
+                        trust_remote_code=True,
+                        token=self.hf_token
+                    )
+            # Create pipeline
             if self.device == "cpu":
                 pipe = pipeline(
                     "text-generation",
@@ -154,8 +184,6 @@ class ModelManager:
                     device=self.device,
                     torch_dtype=torch.float16
                 )
-            
-            # Store loaded model
             self.loaded_models[model_name] = {
                 "pipeline": pipe,
                 "tokenizer": tokenizer,
@@ -163,10 +191,8 @@ class ModelManager:
                 "config": config,
                 "loaded_at": time.time()
             }
-            
             logger.info(f"Successfully loaded model '{model_name}'")
             return True
-            
         except Exception as e:
             logger.error(f"Failed to load model '{model_name}': {e}")
             return False

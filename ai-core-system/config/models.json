@@ -38,7 +38,8 @@
     },
     "code-du-travail-mistral": {
       "type": "transformers",
-      "path": "Pyzeur/Code-du-Travail-mistral-finetune",
+      "path": "mistralai/Mistral-7B-Instruct-v0.3",
+      "adapter": "Pyzeur/Code-du-Travail-mistral-finetune",
       "format": "safetensor",
       "device": "cpu",
       "quantization": "none",
