@@ -3,39 +3,36 @@
 # Script to commit and push deployment script corrections
 # Run this script from the root of the repository
 
-echo "🚀 Committing and pushing deployment script corrections..."
+echo "🚀 Committing and pushing cron fix..."
 
 # Add all changes
 git add .
 
 # Commit with descriptive message
-git commit -m "🔧 Fix deployment script for correct workflow
+git commit -m "🔧 Fix cron installation and scheduling in deployment script
 
-- Fixed deployment script to work when run from ai-core-system directory
-- Removed redundant repository cloning logic
-- Added directory validation to ensure script runs from correct location
-- Updated SSL configuration handling with proper nginx config switching
-- Fixed systemd service to handle both SSL and non-SSL configurations
-- Updated backup script to handle both configurations
-- Improved deployment guide with corrected workflow
-- Added proper error handling and validation
+- Added cron package to system installation
+- Added configure_cron() function to ensure cron service is running
+- Added error handling for crontab commands
+- Added checks to prevent duplicate cron jobs
+- Added fallback messages when crontab is not available
+- Fixed backup script scheduling
+- Fixed SSL certificate auto-renewal scheduling
 
-The script now correctly assumes the repository is already cloned
-and the script is run from within the ai-core-system directory."
+This fixes the 'crontab: command not found' error during deployment."
 
 # Push to remote repository
 git push origin main
 
-echo "✅ Changes committed and pushed successfully!"
+echo "✅ Cron fix committed and pushed successfully!"
 echo ""
 echo "📋 Summary of changes:"
-echo "- Fixed deployment script workflow"
-echo "- Added proper SSL configuration handling"
-echo "- Updated systemd service configuration"
-echo "- Improved backup script"
-echo "- Updated deployment documentation"
+echo "- Fixed cron installation issue"
+echo "- Added robust error handling for crontab"
+echo "- Added cron service configuration"
+echo "- Prevented duplicate cron jobs"
 echo ""
 echo "🎯 Next steps:"
-echo "1. Test the deployment script on your server"
-echo "2. Verify SSL configuration works correctly"
-echo "3. Test API endpoints after deployment" 
+echo "1. Test the deployment script again on your server"
+echo "2. Verify cron jobs are properly scheduled"
+echo "3. Check that backup and SSL renewal work correctly" 

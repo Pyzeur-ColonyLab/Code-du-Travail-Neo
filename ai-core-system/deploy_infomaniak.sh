@@ -73,7 +73,7 @@ update_system() {
     print_status "Updating system packages..."
     apt-get update
     apt-get upgrade -y
-    apt-get install -y curl wget git ufw fail2ban
+    apt-get install -y curl wget git ufw fail2ban cron
 }
 
 # Function to install Docker
@@ -159,6 +159,22 @@ EOF
     systemctl enable fail2ban
     
     print_status "Fail2ban configured successfully"
+}
+
+# Function to configure cron service
+configure_cron() {
+    print_status "Configuring cron service..."
+    
+    # Start and enable cron service
+    systemctl start cron
+    systemctl enable cron
+    
+    # Verify cron is running
+    if systemctl is-active --quiet cron; then
+        print_status "Cron service is running"
+    else
+        print_warning "Cron service failed to start"
+    fi
 }
 
 # Function to setup application directory
@@ -417,10 +433,21 @@ EOF
     
     chmod +x "$APP_DIR/backup.sh"
     
-    # Add to crontab
-    (crontab -l 2>/dev/null; echo "0 2 * * * $APP_DIR/backup.sh") | crontab -
+    # Add to crontab with error handling
+    if command_exists crontab; then
+        # Check if cron job already exists
+        if ! crontab -l 2>/dev/null | grep -q "$APP_DIR/backup.sh"; then
+            (crontab -l 2>/dev/null; echo "0 2 * * * $APP_DIR/backup.sh") | crontab -
+            print_status "Backup script scheduled in crontab"
+        else
+            print_warning "Backup cron job already exists"
+        fi
+    else
+        print_warning "crontab not available, backup script created but not scheduled"
+        print_warning "You can manually schedule it with: crontab -e"
+    fi
     
-    print_status "Backup script created and scheduled"
+    print_status "Backup script created"
 }
 
 # Function to create monitoring setup
@@ -510,8 +537,19 @@ setup_letsencrypt() {
     # Start services with SSL configuration
     docker-compose -f docker-compose-ssl.yml up -d
     
-    # Setup auto-renewal
-    (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_DIR && docker-compose -f docker-compose-ssl.yml restart nginx") | crontab -
+    # Setup auto-renewal with error handling
+    if command_exists crontab; then
+        # Check if SSL renewal job already exists
+        if ! crontab -l 2>/dev/null | grep -q "certbot renew"; then
+            (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_DIR && docker-compose -f docker-compose-ssl.yml restart nginx") | crontab -
+            print_status "SSL certificate auto-renewal scheduled"
+        else
+            print_warning "SSL renewal cron job already exists"
+        fi
+    else
+        print_warning "crontab not available, SSL renewal not scheduled"
+        print_warning "You can manually renew certificates with: certbot renew"
+    fi
     
     print_status "Let's Encrypt SSL certificate configured"
 }
@@ -556,6 +594,7 @@ main() {
     install_docker
     configure_firewall
     configure_fail2ban
+    configure_cron
     setup_app_directory
     create_env_file
     create_model_config
