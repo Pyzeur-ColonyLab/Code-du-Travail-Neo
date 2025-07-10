@@ -69,6 +69,46 @@ class Settings(BaseSettings):
     allowed_hosts: str = Field(default="*", env="ALLOWED_HOSTS")
     huggingface_token: str | None = None  # Add this line to accept the Hugging Face token from env
     
+    # SSL Configuration (optional)
+    ssl_enabled: bool = Field(default=False, env="SSL_ENABLED")
+    ssl_cert_path: str = Field(default="", env="SSL_CERT_PATH")
+    ssl_key_path: str = Field(default="", env="SSL_KEY_PATH")
+    
+    # Cloudflare Configuration (optional)
+    cloudflare_enabled: bool = Field(default=False, env="CLOUDFLARE_ENABLED")
+    cloudflare_api_token: str = Field(default="", env="CLOUDFLARE_API_TOKEN")
+    cloudflare_zone_id: str = Field(default="", env="CLOUDFLARE_ZONE_ID")
+    cloudflare_domain: str = Field(default="", env="CLOUDFLARE_DOMAIN")
+    
+    # Backup Configuration (optional)
+    backup_enabled: bool = Field(default=False, env="BACKUP_ENABLED")
+    backup_schedule: str = Field(default="0 2 * * *", env="BACKUP_SCHEDULE")
+    backup_retention_days: int = Field(default=30, env="BACKUP_RETENTION_DAYS")
+    backup_path: str = Field(default="/backups", env="BACKUP_PATH")
+    
+    # Performance Configuration (optional)
+    worker_processes: int = Field(default=4, env="WORKER_PROCESSES")
+    worker_threads: int = Field(default=2, env="WORKER_THREADS")
+    max_concurrent_requests: int = Field(default=100, env="MAX_CONCURRENT_REQUESTS")
+    request_timeout: int = Field(default=300, env="REQUEST_TIMEOUT")
+    keep_alive_timeout: int = Field(default=5, env="KEEP_ALIVE_TIMEOUT")
+    
+    # Model Performance Configuration (optional)
+    max_model_memory_gb: int = Field(default=16, env="MAX_MODEL_MEMORY_GB")
+    model_quantization: str = Field(default="4bit", env="MODEL_QUANTIZATION")
+    enable_model_caching: bool = Field(default=True, env="ENABLE_MODEL_CACHING")
+    model_cache_ttl: int = Field(default=3600, env="MODEL_CACHE_TTL")
+    
+    # Logging Configuration (optional)
+    log_file_path: str = Field(default="/app/logs/ai-api.log", env="LOG_FILE_PATH")
+    log_max_size_mb: int = Field(default=100, env="LOG_MAX_SIZE_MB")
+    log_backup_count: int = Field(default=5, env="LOG_BACKUP_COUNT")
+    
+    # Deployment Configuration (optional)
+    deployment_environment: str = Field(default="production", env="DEPLOYMENT_ENVIRONMENT")
+    deployment_version: str = Field(default="1.0.0", env="DEPLOYMENT_VERSION")
+    deployment_timestamp: str = Field(default="", env="DEPLOYMENT_TIMESTAMP")
+    
     @validator("allowed_origins", pre=True)
     def parse_allowed_origins(cls, v):
         """Parse allowed origins from string to list."""
@@ -105,7 +145,8 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
-        extra = "forbid"
+        extra = "ignore"  # Changed from "forbid" to "ignore" to allow extra env vars
+        protected_namespaces = ('settings_',)  # Fix Pydantic warnings about model_ fields
 
 
 # Global settings instance
