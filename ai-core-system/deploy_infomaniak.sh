@@ -93,7 +93,7 @@ update_system() {
     print_status "Updating system packages..."
     apt-get update
     apt-get upgrade -y
-    apt-get install -y curl wget git ufw fail2ban cron
+    apt-get install -y curl wget git ufw fail2ban cron dnsutils
 }
 
 # Function to install Docker
@@ -532,11 +532,27 @@ deploy_application() {
 check_dns_resolution() {
     print_status "Checking DNS resolution for $DOMAIN..."
     
-    # Check if domain resolves
-    if nslookup "$DOMAIN" >/dev/null 2>&1; then
-        # Get the resolved IP
+    # Try different DNS lookup commands
+    RESOLVED_IP=""
+    
+    # Try dig first (most reliable)
+    if command_exists dig; then
+        RESOLVED_IP=$(dig +short "$DOMAIN" | head -1)
+    # Try host command as fallback
+    elif command_exists host; then
+        RESOLVED_IP=$(host "$DOMAIN" | grep "has address" | awk '{print $NF}' | head -1)
+    # Try nslookup as last resort
+    elif command_exists nslookup; then
         RESOLVED_IP=$(nslookup "$DOMAIN" | grep -A1 "Name:" | tail -1 | awk '{print $2}')
-        
+    else
+        print_error "No DNS lookup tools available (dig, host, or nslookup)"
+        print_error "Installing dnsutils..."
+        apt-get install -y dnsutils
+        RESOLVED_IP=$(dig +short "$DOMAIN" | head -1)
+    fi
+    
+    # Check if we got a valid IP
+    if [[ -n "$RESOLVED_IP" ]] && [[ "$RESOLVED_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         # Get server's public IP
         SERVER_IP=$(curl -s ifconfig.me)
         

@@ -43,8 +43,8 @@ TTL: 300
 ### 1.3 Verify DNS Propagation
 ```bash
 # Check if DNS is propagating
-nslookup ai-api.cryptomaltese.com
 dig ai-api.cryptomaltese.com
+host ai-api.cryptomaltese.com
 
 # Wait for propagation (can take up to 24 hours)
 # Usually takes 5-15 minutes for most providers
@@ -221,7 +221,7 @@ sudo ./deploy_infomaniak.sh
 
 ```bash
 # 1. Verify DNS is working
-nslookup ai-api.cryptomaltese.com
+dig ai-api.cryptomaltese.com
 # Should return your server IP
 
 # 2. Clone and deploy
@@ -269,7 +269,7 @@ curl -H "X-API-Key: your-api-key" \
 ```bash
 # Check DNS propagation
 dig ai-api.cryptomaltese.com
-nslookup ai-api.cryptomaltese.com
+host ai-api.cryptomaltese.com
 
 # Check if domain resolves to your IP
 host ai-api.cryptomaltese.com
