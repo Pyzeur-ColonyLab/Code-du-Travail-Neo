@@ -3,38 +3,39 @@
 # Script to commit and push deployment script corrections
 # Run this script from the root of the repository
 
-echo "🚀 Committing and pushing docker compose command fix..."
+echo "🚀 Committing and pushing pre-deployment setup guide and DNS improvements..."
 
 # Add all changes
 git add .
 
 # Commit with descriptive message
-git commit -m "🔧 Fix docker compose command detection and usage
+git commit -m "📚 Add pre-deployment setup guide and DNS validation
 
-- Added get_docker_compose_cmd() function to detect correct command
-- Updated all docker-compose references to use detected command
-- Added support for both 'docker compose' (newer) and 'docker-compose' (older)
-- Fixed backup script generation to use correct command
-- Fixed systemd service to use correct command
-- Fixed deploy_application function to use correct command
-- Fixed SSL setup to use correct command
-- Added DOCKER_COMPOSE_CMD variable throughout script
+- Added PRE_DEPLOYMENT_SETUP.md with comprehensive setup instructions
+- Added DNS resolution checking before Let's Encrypt setup
+- Added server IP validation against DNS records
+- Added better error handling for SSL certificate setup
+- Added step-by-step environment configuration guide
+- Added troubleshooting section for common issues
+- Added deployment options (self-signed vs Let's Encrypt)
+- Added verification steps for successful deployment
 
-This fixes the 'docker-compose: command not found' error during deployment."
+This helps users properly configure DNS and environment before deployment."
 
 # Push to remote repository
 git push origin main
 
-echo "✅ Docker compose command fix committed and pushed successfully!"
+echo "✅ Pre-deployment setup guide and DNS improvements committed and pushed successfully!"
 echo ""
 echo "📋 Summary of changes:"
-echo "- Added docker compose command detection"
-echo "- Updated all docker-compose references"
-echo "- Added support for both command formats"
-echo "- Fixed backup script generation"
-echo "- Fixed systemd service configuration"
+echo "- Added comprehensive pre-deployment setup guide"
+echo "- Added DNS resolution validation"
+echo "- Added better SSL setup error handling"
+echo "- Added environment configuration instructions"
+echo "- Added troubleshooting documentation"
 echo ""
 echo "🎯 Next steps:"
-echo "1. Test the deployment script again on your server"
-echo "2. Verify docker compose commands work correctly"
-echo "3. Check that all services start properly" 
+echo "1. Follow the PRE_DEPLOYMENT_SETUP.md guide"
+echo "2. Configure DNS records for your domain"
+echo "3. Set up environment variables"
+echo "4. Run the deployment script" 

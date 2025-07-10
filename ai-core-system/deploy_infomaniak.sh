@@ -528,9 +528,46 @@ deploy_application() {
     fi
 }
 
+# Function to check DNS resolution
+check_dns_resolution() {
+    print_status "Checking DNS resolution for $DOMAIN..."
+    
+    # Check if domain resolves
+    if nslookup "$DOMAIN" >/dev/null 2>&1; then
+        # Get the resolved IP
+        RESOLVED_IP=$(nslookup "$DOMAIN" | grep -A1 "Name:" | tail -1 | awk '{print $2}')
+        
+        # Get server's public IP
+        SERVER_IP=$(curl -s ifconfig.me)
+        
+        if [[ "$RESOLVED_IP" == "$SERVER_IP" ]]; then
+            print_status "DNS resolution successful: $DOMAIN -> $RESOLVED_IP"
+            return 0
+        else
+            print_warning "DNS resolution mismatch:"
+            print_warning "  Domain $DOMAIN resolves to: $RESOLVED_IP"
+            print_warning "  Server IP is: $SERVER_IP"
+            print_warning "  DNS may not be properly configured or propagated"
+            return 1
+        fi
+    else
+        print_error "DNS resolution failed for $DOMAIN"
+        print_error "Please configure DNS records before proceeding"
+        return 1
+    fi
+}
+
 # Function to setup Let's Encrypt SSL
 setup_letsencrypt() {
     print_status "Setting up Let's Encrypt SSL certificate..."
+    
+    # Check DNS resolution first
+    if ! check_dns_resolution; then
+        print_error "DNS resolution failed. Cannot proceed with Let's Encrypt."
+        print_error "Please configure DNS records for $DOMAIN to point to this server."
+        print_error "You can continue with self-signed certificates for now."
+        return 1
+    fi
     
     # Stop nginx temporarily
     cd "$APP_DIR"
@@ -543,35 +580,42 @@ setup_letsencrypt() {
         --no-eff-email \
         -d "$DOMAIN"
     
-    # Copy certificates
-    cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem "$APP_DIR/ssl/cert.pem"
-    cp /etc/letsencrypt/live/$DOMAIN/privkey.pem "$APP_DIR/ssl/key.pem"
-    
-    # Set permissions
-    chmod 644 "$APP_DIR/ssl/cert.pem"
-    chmod 600 "$APP_DIR/ssl/key.pem"
-    
-    # Copy SSL nginx configuration
-    cp "$APP_DIR/nginx/nginx-ssl.conf" "$APP_DIR/nginx/nginx.conf"
-    
-    # Start services with SSL configuration
-    $DOCKER_COMPOSE_CMD -f docker-compose-ssl.yml up -d
-    
-    # Setup auto-renewal with error handling
-    if command_exists crontab; then
-        # Check if SSL renewal job already exists
-        if ! crontab -l 2>/dev/null | grep -q "certbot renew"; then
-            (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_DIR && $DOCKER_COMPOSE_CMD -f docker-compose-ssl.yml restart nginx") | crontab -
-            print_status "SSL certificate auto-renewal scheduled"
+    # Check if certificate was obtained successfully
+    if [[ $? -eq 0 ]]; then
+        # Copy certificates
+        cp /etc/letsencrypt/live/$DOMAIN/fullchain.pem "$APP_DIR/ssl/cert.pem"
+        cp /etc/letsencrypt/live/$DOMAIN/privkey.pem "$APP_DIR/ssl/key.pem"
+        
+        # Set permissions
+        chmod 644 "$APP_DIR/ssl/cert.pem"
+        chmod 600 "$APP_DIR/ssl/key.pem"
+        
+        # Copy SSL nginx configuration
+        cp "$APP_DIR/nginx/nginx-ssl.conf" "$APP_DIR/nginx/nginx.conf"
+        
+        # Start services with SSL configuration
+        $DOCKER_COMPOSE_CMD -f docker-compose-ssl.yml up -d
+        
+        # Setup auto-renewal with error handling
+        if command_exists crontab; then
+            # Check if SSL renewal job already exists
+            if ! crontab -l 2>/dev/null | grep -q "certbot renew"; then
+                (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_DIR && $DOCKER_COMPOSE_CMD -f docker-compose-ssl.yml restart nginx") | crontab -
+                print_status "SSL certificate auto-renewal scheduled"
+            else
+                print_warning "SSL renewal cron job already exists"
+            fi
         else
-            print_warning "SSL renewal cron job already exists"
+            print_warning "crontab not available, SSL renewal not scheduled"
+            print_warning "You can manually renew certificates with: certbot renew"
         fi
+        
+        print_status "Let's Encrypt SSL certificate configured successfully"
     else
-        print_warning "crontab not available, SSL renewal not scheduled"
-        print_warning "You can manually renew certificates with: certbot renew"
+        print_error "Failed to obtain Let's Encrypt certificate"
+        print_error "Continuing with self-signed certificate"
+        return 1
     fi
-    
-    print_status "Let's Encrypt SSL certificate configured"
 }
 
 # Function to display final information
