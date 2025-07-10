@@ -34,6 +34,13 @@ class ModelManager:
         self.model_configs: Dict[str, Dict] = {}
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
+        # Get Hugging Face token from environment
+        self.hf_token = os.getenv("HUGGINGFACE_TOKEN")
+        if self.hf_token:
+            logger.info("Hugging Face token found - will use for model downloads")
+        else:
+            logger.warning("No Hugging Face token found - some models may not be accessible")
+        
         logger.info(f"ModelManager initialized with device: {self.device}")
         logger.info(f"Cache directory: {self.cache_dir}")
     
@@ -98,7 +105,8 @@ class ModelManager:
             tokenizer = AutoTokenizer.from_pretrained(
                 config["path"],
                 cache_dir=self.cache_dir,
-                trust_remote_code=True
+                trust_remote_code=True,
+                token=self.hf_token
             )
             
             # Add padding token if not present
@@ -114,7 +122,8 @@ class ModelManager:
                     torch_dtype=torch.float32,
                     device_map=None,
                     trust_remote_code=True,
-                    low_cpu_mem_usage=True
+                    low_cpu_mem_usage=True,
+                    token=self.hf_token
                 ).to("cpu")
             else:
                 # For GPU, use the original approach
@@ -124,7 +133,8 @@ class ModelManager:
                     cache_dir=self.cache_dir,
                     torch_dtype=torch.float16,
                     device_map="auto",
-                    trust_remote_code=True
+                    trust_remote_code=True,
+                    token=self.hf_token
                 )
             
             # Create pipeline with CPU optimizations

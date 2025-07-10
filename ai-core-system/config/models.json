@@ -35,6 +35,19 @@
       "temperature": 0.7,
       "top_p": 0.9,
       "max_tokens": 512
+    },
+    "code-du-travail-mistral": {
+      "type": "transformers",
+      "path": "Pyzeur/Code-du-Travail-mistral-finetune",
+      "format": "safetensor",
+      "device": "cpu",
+      "quantization": "none",
+      "max_memory": "8GB",
+      "context_length": 4096,
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "max_tokens": 512,
+      "requires_token": true
     }
   },
   "default_model": "tiny-llama",
