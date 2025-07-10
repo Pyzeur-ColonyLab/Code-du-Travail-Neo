@@ -18,6 +18,7 @@ DOMAIN="ai-api.cryptomaltese.com"
 EMAIL="admin@cryptomaltese.com"
 APP_DIR="/opt/ai-core-system"
 CURRENT_DIR="$(pwd)"
+DOCKER_COMPOSE_CMD=""
 
 # Logging
 LOG_FILE="/var/log/ai-core-deployment.log"
@@ -47,6 +48,25 @@ print_error() {
 # Function to check if command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
+}
+
+# Function to get docker compose command
+get_docker_compose_cmd() {
+    if command_exists docker; then
+        # Try docker compose (newer version)
+        if docker compose version >/dev/null 2>&1; then
+            echo "docker compose"
+        # Try docker-compose (older version)
+        elif command_exists docker-compose; then
+            echo "docker-compose"
+        else
+            print_error "Neither 'docker compose' nor 'docker-compose' is available"
+            exit 1
+        fi
+    else
+        print_error "Docker is not installed"
+        exit 1
+    fi
 }
 
 # Function to check if running as root
@@ -372,8 +392,8 @@ After=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=$APP_DIR
-ExecStart=/bin/bash -c 'if [ -f "ssl/cert.pem" ] && [ -f "ssl/key.pem" ]; then docker-compose -f docker-compose-ssl.yml up -d; else docker-compose up -d; fi'
-ExecStop=/bin/bash -c 'if [ -f "ssl/cert.pem" ] && [ -f "ssl/key.pem" ]; then docker-compose -f docker-compose-ssl.yml down; else docker-compose down; fi'
+ExecStart=/bin/bash -c 'if [ -f "ssl/cert.pem" ] && [ -f "ssl/key.pem" ]; then $DOCKER_COMPOSE_CMD -f docker-compose-ssl.yml up -d; else $DOCKER_COMPOSE_CMD up -d; fi'
+ExecStop=/bin/bash -c 'if [ -f "ssl/cert.pem" ] && [ -f "ssl/key.pem" ]; then $DOCKER_COMPOSE_CMD -f docker-compose-ssl.yml down; else $DOCKER_COMPOSE_CMD down; fi'
 TimeoutStartSec=0
 
 [Install]
@@ -391,7 +411,7 @@ EOF
 create_backup_script() {
     print_status "Creating backup script..."
     
-    cat > "$APP_DIR/backup.sh" << 'EOF'
+    cat > "$APP_DIR/backup.sh" << EOF
 #!/bin/bash
 
 # AI Core System Backup Script
@@ -406,9 +426,9 @@ mkdir -p "$BACKUP_DIR"
 # Stop services
 cd /opt/ai-core-system
 if [ -f "ssl/cert.pem" ] && [ -f "ssl/key.pem" ]; then
-    docker-compose -f docker-compose-ssl.yml down
+    $DOCKER_COMPOSE_CMD -f docker-compose-ssl.yml down
 else
-    docker-compose down
+    $DOCKER_COMPOSE_CMD down
 fi
 
 # Create backup
@@ -420,9 +440,9 @@ tar -czf "$BACKUP_DIR/$BACKUP_FILE" \
 
 # Start services
 if [ -f "ssl/cert.pem" ] && [ -f "ssl/key.pem" ]; then
-    docker-compose -f docker-compose-ssl.yml up -d
+    $DOCKER_COMPOSE_CMD -f docker-compose-ssl.yml up -d
 else
-    docker-compose up -d
+    $DOCKER_COMPOSE_CMD up -d
 fi
 
 # Clean old backups (keep last 7 days)
@@ -486,12 +506,12 @@ deploy_application() {
     # Check if SSL is enabled
     if [[ -f "ssl/cert.pem" ]] && [[ -f "ssl/key.pem" ]]; then
         print_status "SSL certificates found, using SSL configuration..."
-        docker-compose -f docker-compose-ssl.yml build
-        docker-compose -f docker-compose-ssl.yml up -d
+        $DOCKER_COMPOSE_CMD -f docker-compose-ssl.yml build
+        $DOCKER_COMPOSE_CMD -f docker-compose-ssl.yml up -d
     else
         print_status "No SSL certificates found, using HTTP configuration..."
-        docker-compose build
-        docker-compose up -d
+        $DOCKER_COMPOSE_CMD build
+        $DOCKER_COMPOSE_CMD up -d
     fi
     
     # Wait for services to be ready
@@ -499,11 +519,11 @@ deploy_application() {
     sleep 30
     
     # Check service status
-    if docker-compose ps | grep -q "Up"; then
+    if $DOCKER_COMPOSE_CMD ps | grep -q "Up"; then
         print_status "Application deployed successfully"
     else
         print_error "Application deployment failed"
-        docker-compose logs
+        $DOCKER_COMPOSE_CMD logs
         exit 1
     fi
 }
@@ -514,7 +534,7 @@ setup_letsencrypt() {
     
     # Stop nginx temporarily
     cd "$APP_DIR"
-    docker-compose down
+    $DOCKER_COMPOSE_CMD down
     
     # Get certificate
     certbot certonly --standalone \
@@ -535,13 +555,13 @@ setup_letsencrypt() {
     cp "$APP_DIR/nginx/nginx-ssl.conf" "$APP_DIR/nginx/nginx.conf"
     
     # Start services with SSL configuration
-    docker-compose -f docker-compose-ssl.yml up -d
+    $DOCKER_COMPOSE_CMD -f docker-compose-ssl.yml up -d
     
     # Setup auto-renewal with error handling
     if command_exists crontab; then
         # Check if SSL renewal job already exists
         if ! crontab -l 2>/dev/null | grep -q "certbot renew"; then
-            (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_DIR && docker-compose -f docker-compose-ssl.yml restart nginx") | crontab -
+            (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_DIR && $DOCKER_COMPOSE_CMD -f docker-compose-ssl.yml restart nginx") | crontab -
             print_status "SSL certificate auto-renewal scheduled"
         else
             print_warning "SSL renewal cron job already exists"
@@ -570,7 +590,7 @@ display_final_info() {
     echo "Management Commands:"
     echo "  - Start services: systemctl start ai-core-system"
     echo "  - Stop services: systemctl stop ai-core-system"
-    echo "  - View logs: docker-compose logs -f"
+    echo "  - View logs: $DOCKER_COMPOSE_CMD logs -f"
     echo "  - Backup: $APP_DIR/backup.sh"
     echo ""
     echo "Next Steps:"
@@ -587,6 +607,10 @@ display_final_info() {
 main() {
     check_root
     check_directory
+    
+    # Set docker compose command
+    DOCKER_COMPOSE_CMD=$(get_docker_compose_cmd)
+    print_status "Using Docker Compose command: $DOCKER_COMPOSE_CMD"
     
     print_status "Starting AI Core System deployment..."
     
