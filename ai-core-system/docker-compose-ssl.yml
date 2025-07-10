@@ -12,6 +12,7 @@ services:
       - ./logs:/app/logs
       - ./cache:/app/cache
       - ./models:/app/models
+      - ./config:/app/config
     depends_on:
       - redis
     networks:
