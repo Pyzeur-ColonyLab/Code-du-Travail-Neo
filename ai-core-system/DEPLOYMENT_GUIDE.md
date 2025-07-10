@@ -1,249 +1,124 @@
-# AI Core System - Deployment Guide
+# 🚀 AI Core System Deployment Guide
 
-## Overview
+This guide provides step-by-step instructions for deploying the AI Core System on an Infomaniak VPS.
 
-This guide provides step-by-step instructions for deploying the AI Core System to an Infomaniak VPS instance. The system is designed to run on Ubuntu 22.04 LTS with Docker and provides a scalable AI API service.
+## 📋 Prerequisites
 
-## Prerequisites
+### Required Accounts
+- **Infomaniak Cloud Account**: For hosting the service
+- **Domain Management**: Access to cryptomaltese.com DNS settings
+- **GitHub Account**: For accessing the repository
 
-### Local Development Environment
-- macOS (for local development)
-- Docker Desktop
-- Git
-- SSH key pair for server access
+### Technical Requirements
+- Ubuntu 22.04 LTS or Debian 12 server
+- Root access to the server
+- Basic knowledge of Docker and command line
 
-### Server Requirements
-- Infomaniak VPS Pro 4 or VPS Pro 8
-- Ubuntu 22.04 LTS
-- At least 16GB RAM (32GB recommended)
-- 100GB+ SSD storage
-- Public IP address
-- Domain name (e.g., ai-api.cryptomaltese.com)
-
-## Architecture
+## 🏗️ Architecture Overview
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Nginx         │    │   AI Core API   │    │   Redis Cache   │
-│   (SSL/TLS)     │◄──►│   (FastAPI)     │◄──►│   (Session)     │
+│   Nginx Proxy   │    │   AI API        │    │   Redis Cache   │
+│   (SSL/HTTP)    │    │   (FastAPI)     │    │                 │
+│                 │    │                 │    │                 │
+│ • SSL Termination│   │ • Model Manager │    │ • Response Cache│
+│ • Rate Limiting │    │ • API Endpoints │    │ • Session Store │
+│ • Load Balancing│    │ • Health Checks │    │ • Queue Mgmt    │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   SSL Cert      │    │   AI Models     │    │   Monitoring    │
-│   (Let's Encrypt)│    │   (GGUF/SafeT)  │    │   (Prometheus)  │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    ┌─────────────────┐
+                    │   Domain & DNS  │
+                    │ cryptomaltese.com│
+                    └─────────────────┘
 ```
 
-## Deployment Steps
+## 🎯 Deployment Strategy
 
-### 1. Local Setup
+### Phase 1: Server Setup
+1. **Server Preparation**: VPS Pro 4-8 on Infomaniak
+2. **Domain Configuration**: ai-api.cryptomaltese.com
+3. **SSL Certificate**: Let's Encrypt via Certbot
+4. **Service Deployment**: Docker containers
+5. **Testing**: API endpoints and model loading
 
-#### Clone the Repository
+## 🔧 Detailed Deployment Steps
+
+### Step 1: Server Preparation
+
+#### 1.1 Connect to Your Server
 ```bash
-git clone <repository-url>
-cd ai-core-system
+ssh root@YOUR_SERVER_IP
 ```
 
-#### Configure Environment
-```bash
-# Copy environment template
-cp env.example .env
-
-# Edit configuration
-nano .env
-```
-
-Key configuration options:
-```bash
-# API Configuration
-API_HOST=0.0.0.0
-API_PORT=8000
-DEBUG=false
-
-# Redis Configuration
-REDIS_URL=redis://redis:6379
-
-# Model Configuration
-DEFAULT_MODEL=mistral-7b-instruct
-MODEL_CONFIG_PATH=/app/config/models.json
-
-# Security
-API_KEY_HEADER=X-API-Key
-DEFAULT_API_KEY=your-secure-api-key-here
-ADMIN_API_KEY=your-admin-api-key-here
-
-# Domain
-DOMAIN_NAME=ai-api.cryptomaltese.com
-```
-
-#### Test Local Deployment
-```bash
-# Start services
-docker-compose up -d
-
-# Check logs
-docker-compose logs -f ai-api
-
-# Test API
-curl -H "X-API-Key: your-secure-api-key-here" \
-     http://localhost:8000/health
-```
-
-### 2. Server Preparation
-
-#### Connect to VPS
-```bash
-ssh root@your-vps-ip
-```
-
-#### Update System
+#### 1.2 Update System
 ```bash
 apt update && apt upgrade -y
 ```
 
-#### Install Required Packages
+### Step 2: Repository Setup
+
+#### 2.1 Clone the Repository
 ```bash
-apt install -y \
-    curl \
-    wget \
-    git \
-    ufw \
-    certbot \
-    python3-certbot-nginx \
-    nginx \
-    jq
+# Clone the main repository
+git clone https://github.com/your-username/Code-du-Travail-Neo.git
+cd Code-du-Travail-Neo/ai-core-system
+
+# Verify you're in the correct directory
+ls -la
+# Should show: docker-compose.yml, Dockerfile, deploy_infomaniak.sh, etc.
 ```
 
-### 3. Automated Deployment
-
-#### Run Deployment Script
+#### 2.2 Run the Deployment Script
 ```bash
-# Make script executable
-chmod +x scripts/deploy_infomaniak.sh
+# Make the script executable
+chmod +x deploy_infomaniak.sh
 
-# Run deployment
-./scripts/deploy_infomaniak.sh
+# Run the deployment script
+sudo ./deploy_infomaniak.sh
 ```
 
-The script will:
-1. Install Docker and Docker Compose
-2. Setup SSL certificates
-3. Configure firewall
-4. Deploy the application
-5. Setup monitoring (optional)
+### Step 3: What the Script Does
 
-#### Manual Deployment Steps
+The deployment script automatically handles:
 
-If you prefer manual deployment:
+1. **System Updates**: Updates packages and installs dependencies
+2. **Docker Installation**: Installs Docker and Docker Compose
+3. **Security Setup**: Configures firewall and fail2ban
+4. **Application Setup**: Copies files to `/opt/ai-core-system`
+5. **Configuration**: Creates environment and model configuration files
+6. **SSL Setup**: Creates self-signed certificates (can be upgraded to Let's Encrypt)
+7. **Service Management**: Creates systemd service for auto-start
+8. **Backup Setup**: Configures automated backups
+9. **Monitoring**: Sets up basic monitoring
 
-##### Install Docker
+### Step 4: Post-Deployment Configuration
+
+#### 4.1 Edit Environment Configuration
 ```bash
-# Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-
-# Add user to docker group
-usermod -aG docker $USER
-
-# Install Docker Compose
-curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
+nano /opt/ai-core-system/.env
 ```
 
-##### Deploy Application
+**Important settings to configure:**
 ```bash
-# Create deployment directory
-mkdir -p /opt/ai-core-system
-cd /opt/ai-core-system
+# API Keys (REQUIRED)
+API_KEYS=["your-production-api-key-1", "your-production-api-key-2"]
 
-# Copy application files (from local machine)
-scp -r . root@your-vps-ip:/opt/ai-core-system/
+# Model Configuration
+DEFAULT_MODEL=mistral-7b-instruct
 
-# Create necessary directories
-mkdir -p models cache logs backups nginx/ssl
-
-# Build and start services
-docker-compose build
-docker-compose up -d
+# Security Settings
+RATE_LIMIT_PER_MINUTE=60
+MAX_PROMPT_LENGTH=4096
 ```
 
-### 4. SSL Certificate Setup
-
-#### Automatic Setup
+#### 4.2 Configure Models
 ```bash
-# Make script executable
-chmod +x scripts/setup_ssl.sh
-
-# Run SSL setup
-sudo ./scripts/setup_ssl.sh
+nano /opt/ai-core-system/models.json
 ```
 
-#### Manual SSL Setup
-```bash
-# Install certbot
-apt install -y certbot python3-certbot-nginx
-
-# Obtain certificate
-certbot certonly --standalone \
-    --email admin@cryptomaltese.com \
-    --agree-tos \
-    --no-eff-email \
-    --domains ai-api.cryptomaltese.com
-
-# Setup nginx with SSL
-# (See nginx/nginx.conf for configuration)
-```
-
-### 5. DNS Configuration
-
-#### Update DNS Records
-In your domain registrar or DNS provider:
-
-```
-Type: A
-Name: ai-api
-Value: your-vps-ip
-TTL: 300
-```
-
-#### Verify DNS
-```bash
-nslookup ai-api.cryptomaltese.com
-dig ai-api.cryptomaltese.com
-```
-
-### 6. Firewall Configuration
-
-#### Setup UFW
-```bash
-# Reset firewall
-ufw --force reset
-
-# Set default policies
-ufw default deny incoming
-ufw default allow outgoing
-
-# Allow SSH
-ufw allow ssh
-
-# Allow HTTP and HTTPS
-ufw allow 80/tcp
-ufw allow 443/tcp
-
-# Enable firewall
-ufw --force enable
-
-# Check status
-ufw status verbose
-```
-
-## Configuration
-
-### Model Configuration
-
-Edit `config/models.json` to configure available models:
-
+**Example model configuration:**
 ```json
 {
   "models": {
@@ -259,310 +134,246 @@ Edit `config/models.json` to configure available models:
 }
 ```
 
-### Nginx Configuration
+### Step 5: SSL Certificate Setup
 
-The Nginx configuration is located in `nginx/nginx.conf` and includes:
-- SSL termination
-- Reverse proxy to FastAPI
-- Rate limiting
-- Security headers
-- Gzip compression
-
-### Environment Variables
-
-Key environment variables in `.env`:
-
+#### 5.1 Let's Encrypt SSL (Recommended)
 ```bash
-# API Configuration
-API_HOST=0.0.0.0
-API_PORT=8000
-DEBUG=false
-
-# Redis Configuration
-REDIS_URL=redis://redis:6379
-
-# Model Configuration
-DEFAULT_MODEL=mistral-7b-instruct
-MODEL_CONFIG_PATH=/app/config/models.json
-
-# Security
-API_KEY_HEADER=X-API-Key
-DEFAULT_API_KEY=your-secure-api-key
-ADMIN_API_KEY=your-admin-api-key
-
-# Performance
-API_WORKERS=4
-RATE_LIMIT_PER_MINUTE=60
-MAX_PROMPT_LENGTH=4096
+# The script will prompt you to setup Let's Encrypt
+# If you choose 'y', it will automatically:
+# - Stop nginx temporarily
+# - Obtain SSL certificate
+# - Configure nginx for SSL
+# - Restart services with SSL
 ```
 
-## Monitoring
-
-### Health Checks
+#### 5.2 Manual SSL Setup (Alternative)
 ```bash
-# Check service status
-docker-compose ps
+cd /opt/ai-core-system
 
-# Check application health
+# Get certificate
+certbot certonly --standalone \
+    --email admin@cryptomaltese.com \
+    --agree-tos \
+    --no-eff-email \
+    -d ai-api.cryptomaltese.com
+
+# Copy certificates
+cp /etc/letsencrypt/live/ai-api.cryptomaltese.com/fullchain.pem ssl/cert.pem
+cp /etc/letsencrypt/live/ai-api.cryptomaltese.com/privkey.pem ssl/key.pem
+
+# Restart with SSL
+docker-compose -f docker-compose-ssl.yml down
+docker-compose -f docker-compose-ssl.yml up -d
+```
+
+## 🧪 Testing and Validation
+
+### 1. Health Check
+```bash
+# Test basic health
+curl http://localhost/health
+
+# Test with domain (after DNS setup)
 curl https://ai-api.cryptomaltese.com/health
-
-# Check logs
-docker-compose logs -f ai-api
 ```
 
-### Metrics
+### 2. API Testing
 ```bash
-# Get system metrics
-curl -H "X-API-Key: your-api-key" \
-     https://ai-api.cryptomaltese.com/api/v1/metrics
-```
-
-### Prometheus/Grafana (Optional)
-```bash
-# Start monitoring services
-docker-compose --profile monitoring up -d
-
-# Access Grafana
-# URL: https://ai-api.cryptomaltese.com:3000
-# Username: admin
-# Password: admin
-```
-
-## API Usage
-
-### Authentication
-All API requests require an API key in the header:
-```bash
-X-API-Key: your-secure-api-key
-```
-
-### Text Generation
-```bash
-curl -X POST "https://ai-api.cryptomaltese.com/api/v1/generate" \
-  -H "X-API-Key: your-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "mistral-7b-instruct",
-    "prompt": "What is French labor law?",
-    "max_tokens": 512,
-    "temperature": 0.7
-  }'
-```
-
-### Chat Conversation
-```bash
-curl -X POST "https://ai-api.cryptomaltese.com/api/v1/chat" \
-  -H "X-API-Key: your-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "mistral-7b-instruct",
-    "messages": [
-      {"role": "user", "content": "Hello"},
-      {"role": "assistant", "content": "Hi there!"},
-      {"role": "user", "content": "How are you?"}
-    ]
-  }'
-```
-
-### Model Management
-```bash
-# List models
+# Test model listing
 curl -H "X-API-Key: your-api-key" \
      https://ai-api.cryptomaltese.com/api/v1/models
 
-# Load model
-curl -X POST "https://ai-api.cryptomaltese.com/api/v1/models/load" \
-  -H "X-API-Key: your-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{"model": "mistral-7b-instruct"}'
-
-# Unload model
-curl -X POST "https://ai-api.cryptomaltese.com/api/v1/models/unload" \
-  -H "X-API-Key: your-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{"model": "mistral-7b-instruct"}'
+# Test generation
+curl -X POST https://ai-api.cryptomaltese.com/api/v1/generate \
+     -H "Content-Type: application/json" \
+     -H "X-API-Key: your-api-key" \
+     -d '{
+       "model": "mistral-7b-instruct",
+       "prompt": "Hello, how are you?",
+       "max_tokens": 50
+     }'
 ```
 
-## Maintenance
-
-### Backup
+### 3. Service Status
 ```bash
-# Backup configuration
-tar -czf backup-$(date +%Y%m%d).tar.gz \
-    config/ models/ logs/ .env
+# Check container status
+docker-compose ps
 
-# Backup Redis data
-docker exec ai-core-redis redis-cli BGSAVE
+# View logs
+docker-compose logs -f
+
+# Check systemd service
+systemctl status ai-core-system
 ```
 
-### Updates
-```bash
-# Pull latest changes
-git pull origin main
+## 📊 Management Commands
 
-# Rebuild and restart
-docker-compose down
+### Service Management
+```bash
+# Start services
+systemctl start ai-core-system
+
+# Stop services
+systemctl stop ai-core-system
+
+# Restart services
+systemctl restart ai-core-system
+
+# View service status
+systemctl status ai-core-system
+```
+
+### Docker Management
+```bash
+cd /opt/ai-core-system
+
+# View running containers
+docker-compose ps
+
+# View logs
+docker-compose logs -f
+
+# Restart specific service
+docker-compose restart ai-api
+
+# Update and rebuild
+git pull
 docker-compose build
 docker-compose up -d
 ```
 
-### SSL Certificate Renewal
+### Backup and Maintenance
 ```bash
-# Manual renewal
-certbot renew
+# Manual backup
+/opt/ai-core-system/backup.sh
 
-# Check renewal status
-certbot certificates
+# View backup files
+ls -la /opt/ai-core-system/backups/
+
+# Check disk usage
+df -h
+
+# Monitor system resources
+htop
 ```
 
-### Log Rotation
-```bash
-# Configure log rotation
-cat > /etc/logrotate.d/ai-core << EOF
-/opt/ai-core-system/logs/*.log {
-    daily
-    missingok
-    rotate 7
-    compress
-    delaycompress
-    notifempty
-    create 644 root root
-}
-EOF
-```
+## 🔒 Security Considerations
 
-## Troubleshooting
+### 1. API Key Management
+- Use strong, unique API keys
+- Rotate keys regularly
+- Monitor API key usage
+- Store keys securely in environment variables
+
+### 2. Firewall Configuration
+The script automatically configures:
+- SSH access only
+- HTTP (80) and HTTPS (443) ports
+- API port (8000) if needed
+- Rate limiting via nginx
+
+### 3. SSL/TLS Security
+- Uses Let's Encrypt certificates
+- Automatic renewal setup
+- Strong SSL/TLS configuration
+- HSTS headers enabled
+
+## 🚨 Troubleshooting
 
 ### Common Issues
 
-#### Service Not Starting
-```bash
-# Check logs
-docker-compose logs ai-api
+1. **SSL Certificate Issues**
+   ```bash
+   # Check certificate status
+   certbot certificates
+   
+   # Renew certificates manually
+   certbot renew
+   ```
 
-# Check system resources
-free -h
-df -h
+2. **Docker Issues**
+   ```bash
+   # Check container status
+   docker-compose ps -a
+   
+   # Check container logs
+   docker-compose logs container_name
+   
+   # Restart services
+   docker-compose restart
+   ```
 
-# Check Docker status
-systemctl status docker
-```
+3. **API Connection Issues**
+   ```bash
+   # Test API connectivity
+   curl -v http://localhost/health
+   
+   # Check firewall rules
+   ufw status
+   ```
 
-#### SSL Certificate Issues
-```bash
-# Check certificate status
-certbot certificates
+4. **Memory Issues**
+   ```bash
+   # Check memory usage
+   free -h
+   
+   # Check Docker memory usage
+   docker stats
+   ```
 
-# Test SSL connection
-openssl s_client -connect ai-api.cryptomaltese.com:443
-
-# Renew certificate
-certbot renew --force-renewal
-```
-
-#### Model Loading Issues
-```bash
-# Check model configuration
-cat config/models.json
-
-# Check available memory
-free -h
-
-# Check model files
-ls -la models/
-```
-
-#### API Authentication Issues
-```bash
-# Check API key in headers
-curl -v -H "X-API-Key: your-api-key" \
-     https://ai-api.cryptomaltese.com/api/v1/models
-
-# Check environment variables
-docker-compose exec ai-api env | grep API_KEY
-```
-
-### Performance Optimization
-
-#### Memory Management
-```bash
-# Monitor memory usage
-docker stats
-
-# Adjust model quantization
-# Edit config/models.json to use 4bit quantization
-```
-
-#### Caching
-```bash
-# Check Redis cache
-docker exec ai-core-redis redis-cli INFO memory
-
-# Clear cache if needed
-docker exec ai-core-redis redis-cli FLUSHDB
-```
-
-#### Load Balancing
-```bash
-# Scale API workers
-# Edit .env: API_WORKERS=8
-
-# Restart services
-docker-compose restart ai-api
-```
-
-## Security Considerations
-
-### API Key Management
-- Use strong, unique API keys
-- Rotate keys regularly
-- Use different keys for different services
-- Monitor API key usage
-
-### Network Security
-- Keep firewall rules minimal
-- Use HTTPS for all communications
-- Implement rate limiting
-- Monitor access logs
-
-### Model Security
-- Validate all inputs
-- Implement content filtering
-- Monitor model usage
-- Regular security updates
-
-## Support
-
-### Documentation
-- API Documentation: https://ai-api.cryptomaltese.com/docs
-- OpenAPI Spec: https://ai-api.cryptomaltese.com/openapi.json
-
-### Monitoring
-- Health Check: https://ai-api.cryptomaltese.com/health
-- Metrics: https://ai-api.cryptomaltese.com/api/v1/metrics
-
-### Logs
+### Log Locations
 ```bash
 # Application logs
-docker-compose logs -f ai-api
+tail -f /opt/ai-core-system/logs/ai-api.log
 
-# Nginx logs
-tail -f /var/log/nginx/access.log
-tail -f /var/log/nginx/error.log
+# Docker logs
+docker-compose logs -f
 
 # System logs
-journalctl -u docker
-journalctl -u nginx
+journalctl -u ai-core-system -f
+
+# Nginx logs
+docker-compose logs nginx
 ```
 
-## Next Steps
+## 📈 Monitoring and Scaling
 
-1. **Integration**: Connect Telegram and Email services
-2. **Scaling**: Add load balancer and multiple instances
-3. **Monitoring**: Setup comprehensive monitoring and alerting
-4. **Backup**: Implement automated backup strategy
-5. **Security**: Regular security audits and updates
+### 1. Resource Monitoring
+```bash
+# Monitor system resources
+htop
+df -h
+free -h
+
+# Monitor Docker resources
+docker stats
+```
+
+### 2. Application Monitoring
+```bash
+# Check API metrics
+curl https://ai-api.cryptomaltese.com/metrics
+
+# Monitor response times
+curl -w "@curl-format.txt" https://ai-api.cryptomaltese.com/health
+```
+
+### 3. Scaling Considerations
+- Monitor memory usage for model loading
+- Consider horizontal scaling for high traffic
+- Implement load balancing for multiple instances
+- Use shared Redis clusters for caching
+
+## 📞 Support
+
+For deployment issues:
+
+1. Check the troubleshooting section above
+2. Review service logs for error messages
+3. Verify network connectivity and DNS settings
+4. Ensure all environment variables are correctly set
+5. Check system resources (CPU, memory, disk)
 
 ---
 
-For additional support, refer to the main documentation or contact the development team. 
+**Happy Deploying! 🚀** 

@@ -2,6 +2,7 @@
 
 # AI Core System - Infomaniak VPS Deployment Script
 # This script deploys the AI Core System on an Infomaniak VPS
+# Assumes the repository is already cloned and script is run from ai-core-system directory
 
 set -e
 
@@ -15,8 +16,8 @@ NC='\033[0m' # No Color
 # Configuration
 DOMAIN="ai-api.cryptomaltese.com"
 EMAIL="admin@cryptomaltese.com"
-REPO_URL="https://github.com/your-username/ai-core-system.git"
 APP_DIR="/opt/ai-core-system"
+CURRENT_DIR="$(pwd)"
 
 # Logging
 LOG_FILE="/var/log/ai-core-deployment.log"
@@ -26,7 +27,8 @@ echo -e "${BLUE}=== AI Core System Deployment Script ===${NC}"
 echo "Starting deployment at $(date)"
 echo "Domain: $DOMAIN"
 echo "Email: $EMAIL"
-echo "App directory: $APP_DIR"
+echo "Current directory: $CURRENT_DIR"
+echo "Target app directory: $APP_DIR"
 echo ""
 
 # Function to print colored output
@@ -53,6 +55,17 @@ check_root() {
         print_error "This script must be run as root"
         exit 1
     fi
+}
+
+# Function to check if we're in the correct directory
+check_directory() {
+    if [[ ! -f "docker-compose.yml" ]] || [[ ! -f "Dockerfile" ]]; then
+        print_error "This script must be run from the ai-core-system directory"
+        print_error "Current directory: $CURRENT_DIR"
+        print_error "Expected files: docker-compose.yml, Dockerfile"
+        exit 1
+    fi
+    print_status "Directory check passed - running from ai-core-system directory"
 }
 
 # Function to update system
@@ -148,37 +161,29 @@ EOF
     print_status "Fail2ban configured successfully"
 }
 
-# Function to create application directory
-create_app_directory() {
-    print_status "Creating application directory..."
+# Function to setup application directory
+setup_app_directory() {
+    print_status "Setting up application directory..."
     
+    # Create target directory if it doesn't exist
     mkdir -p "$APP_DIR"
+    
+    # Create necessary subdirectories
     mkdir -p "$APP_DIR/logs"
     mkdir -p "$APP_DIR/cache"
     mkdir -p "$APP_DIR/models"
     mkdir -p "$APP_DIR/ssl"
     mkdir -p "$APP_DIR/backups"
     
+    # Copy current directory contents to target directory
+    print_status "Copying application files to $APP_DIR..."
+    cp -r . "$APP_DIR/"
+    
     # Set permissions
     chown -R root:root "$APP_DIR"
     chmod -R 755 "$APP_DIR"
     
-    print_status "Application directory created: $APP_DIR"
-}
-
-# Function to clone repository
-clone_repository() {
-    print_status "Cloning repository..."
-    
-    if [ -d "$APP_DIR/.git" ]; then
-        print_warning "Repository already exists, pulling latest changes..."
-        cd "$APP_DIR"
-        git pull
-    else
-        git clone "$REPO_URL" "$APP_DIR"
-    fi
-    
-    print_status "Repository cloned successfully"
+    print_status "Application directory setup complete: $APP_DIR"
 }
 
 # Function to create environment file
@@ -330,6 +335,9 @@ setup_ssl() {
         -out "$APP_DIR/ssl/cert.pem" \
         -subj "/C=FR/ST=France/L=Paris/O=AI Core System/CN=$DOMAIN"
     
+    # Copy SSL nginx configuration
+    cp "$APP_DIR/nginx/nginx-ssl.conf" "$APP_DIR/nginx/nginx.conf"
+    
     print_status "Self-signed SSL certificate created"
     print_warning "You should replace this with a proper certificate from Let's Encrypt"
 }
@@ -348,8 +356,8 @@ After=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=$APP_DIR
-ExecStart=/usr/local/bin/docker-compose up -d
-ExecStop=/usr/local/bin/docker-compose down
+ExecStart=/bin/bash -c 'if [ -f "ssl/cert.pem" ] && [ -f "ssl/key.pem" ]; then docker-compose -f docker-compose-ssl.yml up -d; else docker-compose up -d; fi'
+ExecStop=/bin/bash -c 'if [ -f "ssl/cert.pem" ] && [ -f "ssl/key.pem" ]; then docker-compose -f docker-compose-ssl.yml down; else docker-compose down; fi'
 TimeoutStartSec=0
 
 [Install]
@@ -381,7 +389,11 @@ mkdir -p "$BACKUP_DIR"
 
 # Stop services
 cd /opt/ai-core-system
-docker-compose down
+if [ -f "ssl/cert.pem" ] && [ -f "ssl/key.pem" ]; then
+    docker-compose -f docker-compose-ssl.yml down
+else
+    docker-compose down
+fi
 
 # Create backup
 tar -czf "$BACKUP_DIR/$BACKUP_FILE" \
@@ -391,7 +403,11 @@ tar -czf "$BACKUP_DIR/$BACKUP_FILE" \
     .
 
 # Start services
-docker-compose up -d
+if [ -f "ssl/cert.pem" ] && [ -f "ssl/key.pem" ]; then
+    docker-compose -f docker-compose-ssl.yml up -d
+else
+    docker-compose up -d
+fi
 
 # Clean old backups (keep last 7 days)
 find "$BACKUP_DIR" -name "ai-core-backup-*.tar.gz" -mtime +7 -delete
@@ -440,9 +456,16 @@ deploy_application() {
     
     cd "$APP_DIR"
     
-    # Build and start services
-    docker-compose build
-    docker-compose up -d
+    # Check if SSL is enabled
+    if [[ -f "ssl/cert.pem" ]] && [[ -f "ssl/key.pem" ]]; then
+        print_status "SSL certificates found, using SSL configuration..."
+        docker-compose -f docker-compose-ssl.yml build
+        docker-compose -f docker-compose-ssl.yml up -d
+    else
+        print_status "No SSL certificates found, using HTTP configuration..."
+        docker-compose build
+        docker-compose up -d
+    fi
     
     # Wait for services to be ready
     print_status "Waiting for services to start..."
@@ -464,7 +487,7 @@ setup_letsencrypt() {
     
     # Stop nginx temporarily
     cd "$APP_DIR"
-    docker-compose stop nginx
+    docker-compose down
     
     # Get certificate
     certbot certonly --standalone \
@@ -481,11 +504,14 @@ setup_letsencrypt() {
     chmod 644 "$APP_DIR/ssl/cert.pem"
     chmod 600 "$APP_DIR/ssl/key.pem"
     
-    # Start nginx
-    docker-compose start nginx
+    # Copy SSL nginx configuration
+    cp "$APP_DIR/nginx/nginx-ssl.conf" "$APP_DIR/nginx/nginx.conf"
+    
+    # Start services with SSL configuration
+    docker-compose -f docker-compose-ssl.yml up -d
     
     # Setup auto-renewal
-    (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_DIR && docker-compose restart nginx") | crontab -
+    (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet && cd $APP_DIR && docker-compose -f docker-compose-ssl.yml restart nginx") | crontab -
     
     print_status "Let's Encrypt SSL certificate configured"
 }
@@ -522,6 +548,7 @@ display_final_info() {
 # Main deployment function
 main() {
     check_root
+    check_directory
     
     print_status "Starting AI Core System deployment..."
     
@@ -529,8 +556,7 @@ main() {
     install_docker
     configure_firewall
     configure_fail2ban
-    create_app_directory
-    clone_repository
+    setup_app_directory
     create_env_file
     create_model_config
     setup_ssl

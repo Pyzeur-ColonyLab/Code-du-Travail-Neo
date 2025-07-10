@@ -1,0 +1,5 @@
+---
+description:Hybrid mode : Making all the modifications locally on mac OS, but please considere that the effective environnement is on the server (infomaniak instance)
+globs:
+alwaysApply: false
+---
