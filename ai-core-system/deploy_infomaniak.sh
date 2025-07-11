@@ -331,27 +331,63 @@ create_model_config() {
     cat > "$APP_DIR/models.json" << EOF
 {
   "models": {
+    "tiny-llama": {
+      "type": "transformers",
+      "path": "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+      "format": "safetensor",
+      "device": "cpu",
+      "quantization": "none",
+      "max_memory": "2GB",
+      "context_length": 2048,
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "max_tokens": 512
+    },
+    "phi-2": {
+      "type": "transformers",
+      "path": "microsoft/phi-2",
+      "format": "safetensor",
+      "device": "cpu",
+      "quantization": "none",
+      "max_memory": "4GB",
+      "context_length": 2048,
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "max_tokens": 512
+    },
     "mistral-7b-instruct": {
       "type": "transformers",
-      "path": "mistralai/Mistral-7B-Instruct-v0.3",
+      "path": "mistralai/Mistral-7B-Instruct-v0.2",
       "format": "safetensor",
-      "device": "auto",
-      "quantization": "4bit",
+      "device": "cpu",
+      "quantization": "none",
       "max_memory": "8GB",
       "context_length": 4096,
-      "threads": 8
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "max_tokens": 512
     },
-    "llama-2-7b-chat": {
-      "type": "gguf",
-      "path": "/models/llama-2-7b-chat.gguf",
-      "format": "gguf",
+    "code-du-travail-mistral": {
+      "type": "transformers",
+      "path": "mistralai/Mistral-7B-Instruct-v0.2",
+      "adapter": "Pyzeur/Code-du-Travail-mistral-finetune",
+      "format": "safetensor",
       "device": "cpu",
-      "quantization": "4bit",
-      "max_memory": "4GB",
+      "quantization": "none",
+      "max_memory": "8GB",
       "context_length": 4096,
-      "threads": 8
+      "temperature": 0.7,
+      "top_p": 0.9,
+      "max_tokens": 512,
+      "requires_token": true,
+      "trust_remote_code": true,
+      "use_fast_tokenizer": false
     }
-  }
+  },
+  "default_model": "tiny-llama",
+  "model_cache_dir": "/app/cache",
+  "model_load_timeout": 300,
+  "model_unload_timeout": 60
 }
 EOF
     
