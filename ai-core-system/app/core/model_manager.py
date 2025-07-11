@@ -49,16 +49,16 @@ class ModelManager:
         logger.info(f"ModelManager initialized with device: {self.device}")
         logger.info(f"Cache directory: {self.cache_dir}")
     
-    def load_config(self, config_path: str = "config/models.json") -> Dict:
+    def load_config(self, config_path: str = "/app/config/models.json") -> Dict:
         """Load model configurations from JSON file."""
         try:
             with open(config_path, 'r') as f:
                 config = json.load(f)
             self.model_configs = config.get("models", {})
-            logger.info(f"Loaded {len(self.model_configs)} model configurations")
+            logger.info(f"Loaded {len(self.model_configs)} model configurations from {config_path}")
             return config
         except Exception as e:
-            logger.error(f"Failed to load model config: {e}")
+            logger.error(f"Failed to load model config from {config_path}: {e}")
             # Return default config
             return {
                 "models": {
@@ -106,12 +106,26 @@ class ModelManager:
             
             # Load tokenizer from base model (not adapter) if adapter is used
             tokenizer_path = config["path"]
-            tokenizer = AutoTokenizer.from_pretrained(
-                tokenizer_path,
-                cache_dir=self.cache_dir,
-                trust_remote_code=True,
-                token=self.hf_token
-            )
+            try:
+                # Try with fast tokenizer first
+                tokenizer = AutoTokenizer.from_pretrained(
+                    tokenizer_path,
+                    cache_dir=self.cache_dir,
+                    trust_remote_code=True,
+                    use_fast=config.get("use_fast_tokenizer", True),
+                    token=self.hf_token
+                )
+            except Exception as e:
+                logger.warning(f"Fast tokenizer failed, trying legacy tokenizer: {e}")
+                # Fallback to legacy tokenizer
+                tokenizer = AutoTokenizer.from_pretrained(
+                    tokenizer_path,
+                    cache_dir=self.cache_dir,
+                    trust_remote_code=True,
+                    use_fast=False,
+                    token=self.hf_token
+                )
+
             if tokenizer.pad_token is None:
                 tokenizer.pad_token = tokenizer.eos_token
             
