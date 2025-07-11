@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Update Models Configuration Script
-# This script ensures the models.json file is always up to date with the latest configuration
+# Comprehensive AI Core System Management Script
+# This script handles models.json configuration, SSL certificates, and service management
 
 set -e
 
@@ -16,6 +16,8 @@ NC='\033[0m' # No Color
 APP_DIR="/opt/ai-core-system"
 CONFIG_FILE="$APP_DIR/config/models.json"
 BACKUP_DIR="$APP_DIR/config/backups"
+DOMAIN="ai.cryptomaltese.com"
+EMAIL="admin@cryptomaltese.com"
 
 # Function to print colored output
 print_status() {
@@ -40,6 +42,11 @@ check_root() {
         print_error "This script must be run as root"
         exit 1
     fi
+}
+
+# Function to check if command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
 }
 
 # Function to backup current configuration
@@ -157,13 +164,106 @@ validate_config() {
     fi
 }
 
-# Function to restart services to pick up new configuration
+# Function to check DNS resolution
+check_dns() {
+    print_status "Checking DNS resolution for $DOMAIN..."
+    
+    if nslookup "$DOMAIN" > /dev/null 2>&1; then
+        print_status "DNS resolution successful for $DOMAIN"
+        return 0
+    else
+        print_error "DNS resolution failed for $DOMAIN"
+        print_warning "Please ensure DNS is properly configured before proceeding"
+        return 1
+    fi
+}
+
+# Function to backup SSL certificates
+backup_ssl_certificates() {
+    print_status "Backing up existing SSL certificates..."
+    
+    SSL_DIR="$APP_DIR/ssl"
+    BACKUP_SSL_DIR="$APP_DIR/ssl/backups"
+    
+    if [[ -d "$SSL_DIR" ]]; then
+        mkdir -p "$BACKUP_SSL_DIR"
+        
+        if [[ -f "$SSL_DIR/cert.pem" ]] || [[ -f "$SSL_DIR/key.pem" ]]; then
+            BACKUP_NAME="ssl_backup_$(date +%Y%m%d_%H%M%S)"
+            BACKUP_PATH="$BACKUP_SSL_DIR/$BACKUP_NAME"
+            
+            mkdir -p "$BACKUP_PATH"
+            
+            if [[ -f "$SSL_DIR/cert.pem" ]]; then
+                cp "$SSL_DIR/cert.pem" "$BACKUP_PATH/"
+                print_status "SSL certificate backed up"
+            fi
+            
+            if [[ -f "$SSL_DIR/key.pem" ]]; then
+                cp "$SSL_DIR/key.pem" "$BACKUP_PATH/"
+                print_status "SSL private key backed up"
+            fi
+            
+            print_status "SSL certificates backed up to: $BACKUP_PATH"
+        else
+            print_warning "No existing SSL certificates found to backup"
+        fi
+    else
+        print_warning "SSL directory does not exist, creating it"
+        mkdir -p "$SSL_DIR"
+    fi
+}
+
+# Function to obtain SSL certificate
+obtain_ssl_certificate() {
+    print_status "Obtaining SSL certificate for $DOMAIN..."
+    
+    SSL_DIR="$APP_DIR/ssl"
+    
+    # Check if certbot is available
+    if ! command_exists certbot; then
+        print_status "Installing certbot..."
+        apt-get update
+        apt-get install -y certbot python3-certbot-nginx
+    fi
+    
+    # Stop nginx temporarily to free port 80
+    print_status "Stopping nginx temporarily for certificate verification..."
+    cd "$APP_DIR"
+    docker compose -f docker-compose-ssl.yml stop nginx || true
+    
+    # Wait a moment for port to be freed
+    sleep 5
+    
+    # Obtain certificate
+    if certbot certonly --standalone \
+        --email "$EMAIL" \
+        --agree-tos \
+        --no-eff-email \
+        --domains "$DOMAIN" \
+        --cert-path "$SSL_DIR/cert.pem" \
+        --key-path "$SSL_DIR/key.pem"; then
+        
+        print_status "SSL certificate obtained successfully"
+        
+        # Set proper permissions
+        chmod 644 "$SSL_DIR/cert.pem"
+        chmod 600 "$SSL_DIR/key.pem"
+        
+        return 0
+    else
+        print_error "Failed to obtain SSL certificate"
+        return 1
+    fi
+}
+
+# Function to restart services
 restart_services() {
-    print_status "Restarting services to pick up new configuration..."
+    print_status "Restarting services..."
     
     cd "$APP_DIR"
     
-    # Check if SSL is enabled
+    # Check if SSL certificates exist
     if [[ -f "ssl/cert.pem" ]] && [[ -f "ssl/key.pem" ]]; then
         print_status "SSL certificates found, using SSL configuration..."
         docker compose -f docker-compose-ssl.yml down
@@ -176,7 +276,7 @@ restart_services() {
     
     # Wait for services to be ready
     print_status "Waiting for services to start..."
-    sleep 10
+    sleep 15
     
     print_status "Services restarted successfully"
 }
@@ -186,7 +286,7 @@ test_configuration() {
     print_status "Testing configuration..."
     
     # Wait a bit for services to be ready
-    sleep 5
+    sleep 10
     
     # Test API health
     if curl -s http://localhost:8000/health > /dev/null 2>&1; then
@@ -207,6 +307,16 @@ test_configuration() {
         fi
     else
         print_warning "Models endpoint is not accessible"
+    fi
+    
+    # Test HTTPS if SSL is configured
+    if [[ -f "$APP_DIR/ssl/cert.pem" ]] && [[ -f "$APP_DIR/ssl/key.pem" ]]; then
+        print_status "Testing HTTPS access..."
+        if curl -s -k https://localhost/health > /dev/null 2>&1; then
+            print_status "HTTPS access working locally"
+        else
+            print_warning "HTTPS access not working locally"
+        fi
     fi
 }
 
@@ -263,12 +373,85 @@ restore_from_backup() {
     restart_services
 }
 
+# Function to setup SSL certificates
+setup_ssl() {
+    print_header "Setting up SSL Certificates"
+    echo ""
+    
+    check_root
+    
+    # Check DNS resolution
+    if ! check_dns; then
+        print_error "DNS resolution failed. Please fix DNS configuration first."
+        exit 1
+    fi
+    
+    # Backup existing certificates
+    backup_ssl_certificates
+    
+    # Obtain new certificate
+    if obtain_ssl_certificate; then
+        # Restart services with SSL
+        restart_services
+        
+        # Test configuration
+        test_configuration
+        
+        print_status "SSL setup completed successfully"
+        print_status "Your site should now be accessible at: https://$DOMAIN"
+    else
+        print_error "SSL setup failed"
+        exit 1
+    fi
+}
+
+# Function to renew SSL certificates
+renew_ssl() {
+    print_header "Renewing SSL Certificates"
+    echo ""
+    
+    check_root
+    
+    SSL_DIR="$APP_DIR/ssl"
+    
+    if [[ ! -f "$SSL_DIR/cert.pem" ]] || [[ ! -f "$SSL_DIR/key.pem" ]]; then
+        print_error "No SSL certificates found. Run 'ssl' command first."
+        exit 1
+    fi
+    
+    # Stop nginx temporarily
+    print_status "Stopping nginx temporarily for certificate renewal..."
+    cd "$APP_DIR"
+    docker compose -f docker-compose-ssl.yml stop nginx || true
+    
+    sleep 5
+    
+    # Renew certificate
+    if certbot renew --cert-path "$SSL_DIR/cert.pem" --key-path "$SSL_DIR/key.pem"; then
+        print_status "SSL certificate renewed successfully"
+        
+        # Set proper permissions
+        chmod 644 "$SSL_DIR/cert.pem"
+        chmod 600 "$SSL_DIR/key.pem"
+        
+        # Restart services
+        restart_services
+        
+        print_status "SSL renewal completed successfully"
+    else
+        print_error "SSL certificate renewal failed"
+        exit 1
+    fi
+}
+
 # Function to display help
 show_help() {
-    echo "Usage: $0 [OPTION]"
+    echo "Usage: $0 [COMMAND] [OPTIONS]"
     echo ""
-    echo "Options:"
-    echo "  update     Update models.json to latest configuration (default)"
+    echo "Commands:"
+    echo "  update     Update models.json to latest configuration and restart services (default)"
+    echo "  ssl        Setup SSL certificates for $DOMAIN"
+    echo "  renew      Renew existing SSL certificates"
     echo "  backup     Create backup of current configuration"
     echo "  restore    Restore configuration from backup"
     echo "  list       List available backups"
@@ -277,12 +460,20 @@ show_help() {
     echo "  help       Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0                    # Update to latest configuration"
+    echo "  $0                    # Update configuration and restart services"
+    echo "  $0 ssl                # Setup SSL certificates"
+    echo "  $0 renew              # Renew SSL certificates"
     echo "  $0 backup             # Create backup"
     echo "  $0 restore /path/to/backup  # Restore from backup"
     echo "  $0 list               # List available backups"
     echo "  $0 show               # Show current configuration"
     echo "  $0 test               # Test configuration"
+    echo ""
+    echo "This script handles:"
+    echo "  - Models configuration management"
+    echo "  - SSL certificate setup and renewal"
+    echo "  - Service restart and testing"
+    echo "  - Backup and restore functionality"
 }
 
 # Main function
@@ -292,7 +483,7 @@ main() {
     case "$action" in
         "update")
             check_root
-            print_header "Updating Models Configuration"
+            print_header "Updating Models Configuration and Services"
             echo ""
             backup_current_config
             create_latest_config
@@ -304,6 +495,12 @@ main() {
                 print_error "Configuration update failed - invalid JSON"
                 exit 1
             fi
+            ;;
+        "ssl")
+            setup_ssl
+            ;;
+        "renew")
+            renew_ssl
             ;;
         "backup")
             check_root
@@ -338,7 +535,7 @@ main() {
             show_help
             ;;
         *)
-            print_error "Unknown action: $action"
+            print_error "Unknown command: $action"
             show_help
             exit 1
             ;;
