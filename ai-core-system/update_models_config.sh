@@ -257,6 +257,75 @@ obtain_ssl_certificate() {
     fi
 }
 
+# Function to build Docker images
+build_images() {
+    print_status "Building Docker images..."
+    
+    cd "$APP_DIR"
+    
+    # Check if SSL certificates exist to determine which compose file to use
+    if [[ -f "ssl/cert.pem" ]] && [[ -f "ssl/key.pem" ]]; then
+        print_status "SSL certificates found, building with SSL configuration..."
+        docker compose -f docker-compose-ssl.yml build --no-cache
+    else
+        print_status "No SSL certificates found, building with HTTP configuration..."
+        docker compose build --no-cache
+    fi
+    
+    if [[ $? -eq 0 ]]; then
+        print_status "Docker images built successfully"
+        return 0
+    else
+        print_error "Docker build failed"
+        return 1
+    fi
+}
+
+# Function to check if rebuild is needed
+check_rebuild_needed() {
+    if [[ -f "requirements.txt" ]] && [[ -f ".last_build" ]]; then
+        if [[ "requirements.txt" -nt ".last_build" ]]; then
+            return 0  # Rebuild needed
+        fi
+    fi
+    return 1  # No rebuild needed
+}
+
+# Function to rebuild and restart services
+rebuild_and_restart() {
+    print_header "Rebuilding and Restarting Services"
+    echo ""
+    
+    check_root
+    
+    # Backup current configuration
+    backup_current_config
+    
+    # Check if rebuild is actually needed
+    if check_rebuild_needed; then
+        print_status "Dependencies have changed, rebuilding images..."
+    else
+        print_warning "No dependency changes detected, but rebuilding anyway..."
+    fi
+    
+    # Build images
+    if build_images; then
+        # Update last build timestamp
+        touch .last_build
+        
+        # Restart services
+        restart_services
+        
+        # Test configuration
+        test_configuration
+        
+        print_status "Rebuild and restart completed successfully"
+    else
+        print_error "Rebuild failed"
+        exit 1
+    fi
+}
+
 # Function to restart services
 restart_services() {
     print_status "Restarting services..."
@@ -450,6 +519,8 @@ show_help() {
     echo ""
     echo "Commands:"
     echo "  update     Update models.json to latest configuration and restart services (default)"
+    echo "  build      Build Docker images with latest dependencies"
+    echo "  rebuild    Rebuild Docker images and restart services"
     echo "  ssl        Setup SSL certificates for $DOMAIN"
     echo "  renew      Renew existing SSL certificates"
     echo "  backup     Create backup of current configuration"
@@ -461,6 +532,8 @@ show_help() {
     echo ""
     echo "Examples:"
     echo "  $0                    # Update configuration and restart services"
+    echo "  $0 build              # Build Docker images"
+    echo "  $0 rebuild            # Rebuild images and restart services"
     echo "  $0 ssl                # Setup SSL certificates"
     echo "  $0 renew              # Renew SSL certificates"
     echo "  $0 backup             # Create backup"
@@ -471,6 +544,7 @@ show_help() {
     echo ""
     echo "This script handles:"
     echo "  - Models configuration management"
+    echo "  - Docker image building and rebuilding"
     echo "  - SSL certificate setup and renewal"
     echo "  - Service restart and testing"
     echo "  - Backup and restore functionality"
@@ -488,6 +562,14 @@ main() {
             backup_current_config
             create_latest_config
             if validate_config; then
+                # Check if rebuild is needed (when requirements.txt changed)
+                if [[ -f "requirements.txt" ]] && [[ -f ".last_build" ]]; then
+                    if [[ "requirements.txt" -nt ".last_build" ]]; then
+                        print_warning "Requirements.txt has changed, rebuilding images..."
+                        build_images
+                        touch .last_build
+                    fi
+                fi
                 restart_services
                 test_configuration
                 print_status "Configuration update completed successfully"
@@ -495,6 +577,15 @@ main() {
                 print_error "Configuration update failed - invalid JSON"
                 exit 1
             fi
+            ;;
+        "build")
+            check_root
+            print_header "Building Docker Images"
+            echo ""
+            build_images
+            ;;
+        "rebuild")
+            rebuild_and_restart
             ;;
         "ssl")
             setup_ssl
