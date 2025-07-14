@@ -81,6 +81,8 @@ class ModelManager:
     def load_model(self, model_name: str) -> bool:
         """Load a specific model into memory."""
         try:
+            # Always reload config from disk before loading a model
+            self.load_config()
             if model_name in self.loaded_models:
                 logger.info(f"Model '{model_name}' is already loaded")
                 return True
