@@ -48,6 +48,10 @@ class ModelInfo(BaseModel):
     top_p: float
     max_tokens: int
     loaded: bool
+    adapter: Optional[str] = None
+    requires_token: Optional[bool] = None
+    trust_remote_code: Optional[bool] = None
+    use_fast_tokenizer: Optional[bool] = None
 
 
 class ModelListResponse(BaseModel):
@@ -95,7 +99,11 @@ async def list_models():
                 temperature=model_config.get("temperature", 0.7),
                 top_p=model_config.get("top_p", 0.9),
                 max_tokens=model_config.get("max_tokens", 512),
-                loaded=model_manager.is_model_loaded(name)
+                loaded=model_manager.is_model_loaded(name),
+                adapter=model_config.get("adapter"),
+                requires_token=model_config.get("requires_token"),
+                trust_remote_code=model_config.get("trust_remote_code"),
+                use_fast_tokenizer=model_config.get("use_fast_tokenizer"),
             ))
         
         return ModelListResponse(
@@ -161,7 +169,11 @@ async def get_model_info(model_name: str):
             temperature=model_config.get("temperature", 0.7),
             top_p=model_config.get("top_p", 0.9),
             max_tokens=model_config.get("max_tokens", 512),
-            loaded=model_manager.is_model_loaded(model_name)
+            loaded=model_manager.is_model_loaded(model_name),
+            adapter=model_config.get("adapter"),
+            requires_token=model_config.get("requires_token"),
+            trust_remote_code=model_config.get("trust_remote_code"),
+            use_fast_tokenizer=model_config.get("use_fast_tokenizer"),
         )
         
     except HTTPException:
