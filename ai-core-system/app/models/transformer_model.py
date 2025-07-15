@@ -1,7 +1,7 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 import torch
-from .base_model import BaseModel
-from typing import Dict, Any
+from app.models.base_model import BaseModel
+from typing import Dict, Any, Optional
 
 class TransformerModel(BaseModel):
     def __init__(self):
@@ -11,28 +11,33 @@ class TransformerModel(BaseModel):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model_info = {}
 
-    def load_model(self, model_path: str):
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-        self.model = AutoModelForCausalLM.from_pretrained(model_path)
+    def load_model(self, model_path: str, hf_token: Optional[str] = None, tokenizer_file: Optional[str] = None):
+        tokenizer_kwargs = {}
+        if tokenizer_file:
+            tokenizer_kwargs['tokenizer_file'] = tokenizer_file
+        if hf_token:
+            tokenizer_kwargs['token'] = hf_token
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, **tokenizer_kwargs)
+        self.model = AutoModelForCausalLM.from_pretrained(model_path, token=hf_token)
         self.model.to(self.device)
         self.model.eval()
         self.pipeline = pipeline(
             "text-generation",
             model=self.model,
             tokenizer=self.tokenizer,
-            device=0 if self.device.type == 'cuda' else -1
+            device=0 if torch.cuda.is_available() else -1
         )
         self.model_info = {
-            "path": model_path,
+            "model_path": model_path,
             "device": str(self.device),
-            "type": "transformers"
+            "tokenizer_file": tokenizer_file,
         }
 
     def predict(self, input_text: str) -> Dict[str, Any]:
         if not self.pipeline:
             raise RuntimeError("Model not loaded.")
-        outputs = self.pipeline(input_text, max_new_tokens=128)
-        return {"generated_text": outputs[0]["generated_text"]}
+        result = self.pipeline(input_text, max_new_tokens=128)
+        return {"result": result}
 
     def get_model_info(self) -> Dict[str, Any]:
         return self.model_info 
