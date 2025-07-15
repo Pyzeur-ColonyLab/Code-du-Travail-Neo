@@ -25,8 +25,8 @@ try:
 except ImportError:
     PeftModel = None
 
-from app.models.model_factory import ModelFactory
-from app.models.base_model import BaseModel
+from ..models.model_factory import ModelFactory
+from ..models.base_model import BaseModel
 
 logger = logging.getLogger(__name__)
 
