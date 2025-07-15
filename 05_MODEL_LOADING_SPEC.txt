@@ -1,0 +1,129 @@
+ # Model Loading Specification (Based on AIdeal)
+
+## 1. Model Abstraction
+- Define a base model interface (abstract class) that all models must implement.
+- The interface should require at least:
+  - `load_model(model_path: str)`
+  - `predict(input_text: str) -> Dict`
+  - `get_model_info() -> Dict`
+
+**Example:**
+```python
+# models/base_model.py
+from abc import ABC, abstractmethod
+
+class BaseModel(ABC):
+    @abstractmethod
+    def load_model(self, model_path: str):
+        pass
+
+    @abstractmethod
+    def predict(self, input_text: str):
+        pass
+
+    @abstractmethod
+    def get_model_info(self):
+        pass
+```
+
+---
+
+## 2. Hugging Face Model Implementation
+- Create a class for Hugging Face models that inherits from the base model.
+- Use `transformers` library’s `from_pretrained` method for both tokenizer and model.
+- Move model to the appropriate device (`cuda` if available, else `cpu`).
+- Set the model to evaluation mode.
+
+**Example:**
+```python
+# models/transformer_model.py
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import torch
+from .base_model import BaseModel
+
+class TransformerModel(BaseModel):
+    def __init__(self):
+        self.model = None
+        self.tokenizer = None
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    def load_model(self, model_path: str):
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self.model = AutoModelForSequenceClassification.from_pretrained(model_path)
+        self.model.to(self.device)
+        self.model.eval()
+```
+
+---
+
+## 3. Model Factory
+- Implement a factory class to instantiate models by name/type.
+- Register available models in a dictionary.
+- Provide methods to create, register, and list models.
+
+**Example:**
+```python
+# models/model_factory.py
+class ModelFactory:
+    _models = {
+        "transformer": TransformerModel,
+        # Add other models here
+    }
+
+    @classmethod
+    def create_model(cls, model_name: str):
+        if model_name not in cls._models:
+            raise ValueError(f"Unknown model: {model_name}")
+        return cls._models[model_name]()
+```
+
+---
+
+## 4. Configuration
+- Store model path and name in a configuration file (e.g., `.env` or `config/settings.py`).
+- Use environment variables for flexibility.
+
+**Example:**
+```python
+# config/settings.py
+import os
+class Settings:
+    MODEL_NAME = os.getenv("MODEL_NAME", "transformer")
+    MODEL_PATH = os.getenv("MODEL_PATH", "./models/saved_models/")
+settings = Settings()
+```
+
+---
+
+## 5. Model Loading in Application
+- Load the model at application startup using the factory and configuration.
+- Call `load_model` with the path from settings.
+
+**Example:**
+```python
+# bot/handlers.py
+from models.model_factory import ModelFactory
+from config.settings import settings
+
+class BotHandlers:
+    def __init__(self):
+        self.model = ModelFactory.create_model(settings.MODEL_NAME)
+        self.model.load_model(settings.MODEL_PATH)
+```
+
+---
+
+## Summary of Steps
+1. Define a base model interface.
+2. Implement a Hugging Face model class using `from_pretrained`.
+3. Use a factory to instantiate models by name.
+4. Store model configuration in environment/config files.
+5. Load the model at startup using the factory and config.
+
+---
+
+**This modular approach ensures:**
+- Easy extension to new model types.
+- Centralized configuration.
+- Clean separation of concerns.
+- Reusability across projects. 
